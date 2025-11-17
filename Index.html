@@ -1,4 +1,6 @@
-<!DOCTYPE html>
+        ws.onclose = () => location.reload();
+
+        // Mobile <!DOCTYPE html>
 <html lang="hi">
 <head>
     <meta charset="UTF-8">
@@ -17,11 +19,13 @@
         .neg {color:#f00; font-weight:bold; font-size:1.3em;}
         #count {position:fixed; top:15px; right:15px; background:#f00; color:#fff; width:60px; height:60px; border-radius:50%; font-size:24px; line-height:60px; display:none; z-index:99;}
         #time {text-align:center; margin:10px; color:#888; font-size:14px;}
+        #error {color: #f00; text-align: center; display: none;}
     </style>
 </head>
 <body>
     <h1>±0.50% Funding Alert [LIVE]</h1>
     <div id="status" class="off">Connecting...</div>
+    <div id="error"></div>
     <div id="count">0</div>
 
     <table id="tbl">
@@ -30,56 +34,82 @@
     </table>
     <div id="time">Kabhi nahi</div>
 
-    <audio id="beep" src="https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3"></audio>
+    <audio id="beep" src="https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3" preload="auto"></audio>
 
     <script>
-        const ws = new WebSocket('wss://websocket.india.delta.exchange');
+        // Changed to global server for better connection
+        const ws = new WebSocket('wss://websocket.delta.exchange');
         const tbl = document.querySelector('#tbl tbody');
         const stat = document.getElementById('status');
         const cnt = document.getElementById('count');
         const beep = document.getElementById('beep');
         const timeDiv = document.getElementById('time');
+        const errorDiv = document.getElementById('error');
 
         let rates = {};
         let alreadyAlerted = new Set();
 
         ws.onopen = () => {
-            stat.textContent = "LIVE DATA ON";
+            stat.textContent = "LIVE DATA ON ✅";
             stat.className = "on";
+            errorDiv.style.display = 'none';
             ws.send(JSON.stringify({"type":"subscribe","channel":"funding_rates"}));
+            console.log('WebSocket connected!');
         };
 
         ws.onmessage = (e) => {
-            const msg = JSON.parse(e.data);
-            if (msg.channel !== "funding_rates") return;
+            try {
+                const msg = JSON.parse(e.data);
+                if (msg.channel !== "funding_rates") return;
 
-            let newAlert = false;
-            (Array.isArray(msg.payload) ? msg.payload : [msg.payload]).forEach(p => {
-                if (!p.symbol || !p.funding_rate) return;
-                const sym = p.symbol.replace("USDT","").replace("PERP","");
-                const rate = parseFloat(p.funding_rate);
-                const t = new Date(p.timestamp*1000).toLocaleTimeString('en-IN');
+                let newAlert = false;
+                const payload = Array.isArray(msg.payload) ? msg.payload : [msg.payload];
+                payload.forEach(p => {
+                    if (!p.symbol || !p.funding_rate) return;
+                    const sym = p.symbol.replace("USDT","").replace("PERP","");
+                    const rate = parseFloat(p.funding_rate);
+                    const t = new Date(p.timestamp*1000).toLocaleTimeString('en-IN');
 
-                rates[sym] = {rate, t};
+                    rates[sym] = {rate, t};
 
-                if (Math.abs(rate) >= 0.005) { // 0.50%
-                    if (!alreadyAlerted.has(sym)) {
-                        alreadyAlerted.add(sym);
-                        newAlert = true;
+                    if (Math.abs(rate) >= 0.005) { // 0.50%
+                        if (!alreadyAlerted.has(sym)) {
+                            alreadyAlerted.add(sym);
+                            newAlert = true;
+                        }
+                    } else {
+                        alreadyAlerted.delete(sym);
                     }
-                } else {
-                    alreadyAlerted.delete(sym);
+                });
+
+                if (newAlert) {
+                    beep.play().catch(err => console.log('Sound error:', err));
+                    cnt.textContent = alreadyAlerted.size;
+                    cnt.style.display = "block";
                 }
-            });
 
-            if (newAlert) {
-                beep.play();
-                cnt.textContent = alreadyAlerted.size;
-                cnt.style.display = "block";
+                showTable();
+                timeDiv.textContent = "Update: " + new Date().toLocaleString('hi-IN');
+            } catch (err) {
+                console.error('Message parse error:', err);
             }
+        };
 
-            showTable();
-            timeDiv.textContent = "Update: " + new Date().toLocaleString('hi-IN');
+        ws.onerror = (err) => {
+            stat.textContent = "Connection Error! Reload karo...";
+            stat.className = "off";
+            errorDiv.textContent = "WebSocket error: Server busy? Try again in 1 min.";
+            errorDiv.style.display = 'block';
+            console.error('WebSocket error:', err);
+        };
+
+        ws.onclose = (event) => {
+            stat.textContent = "Disconnected! Reconnecting...";
+            stat.className = "off";
+            errorDiv.style.display = 'none';
+            if (event.code !== 1000) {
+                setTimeout(() => location.reload(), 3000); // Auto reconnect after 3 sec
+            }
         };
 
         function showTable() {
@@ -103,9 +133,13 @@
             });
         }
 
-        ws.onclose = () => location.reload();
-
         // Mobile screen hamesha on rahe
+        if ("wakeLock" in navigator) {
+            navigator.wakeLock.request("screen").catch(()=>{});
+        }
+    </script>
+</body>
+</html>screen hamesha on rahe
         if ("wakeLock" in navigator) {
             navigator.wakeLock.request("screen").catch(()=>{});
         }
