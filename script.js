@@ -4,7 +4,7 @@ const API_SECRET = "qIVYL0KnJV7CU5xw7i5nErVKCtajVU2IkyubMF4gRcfpUDQEHLCllFtMals4
 // =====================================================
 
 const API_URL = "https://api.delta.exchange/v2/tickers?contract_types=perpetual";
-const THRESHOLD = 0.0050; // 0.50% = 0.0050
+const THRESHOLD = 0.0001; // 0.50% = 0.0050
 
 function generateSignature(timestamp) {
     const string = timestamp + "GET" + "/v2/tickers";
