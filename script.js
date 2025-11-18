@@ -1,109 +1,66 @@
-/**
- * Delta Exchange Monitor - Public REST API Polling Version
- * यह कोड सुरक्षित रूप से Public REST API का उपयोग करता है।
- */
+const API_URL = "https://api.delta.exchange/v2/tickers?contract_types=perpetual";
+const THRESHOLD = 0.0050; // 0.50% = 0.0050
 
-// 1. कॉन्फ़िगरेशन
-const REST_API_URL = "https://api.delta.exchange/v2/products"; 
-const FUNDING_THRESHOLD = 0.0050; // 0.50%
-const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 मिनट
+async function fetchData() {
+    const tableBody = document.getElementById("table-body");
+    const loading = document.getElementById("loading");
+    const noData = document.getElementById("no-data");
+    const lastUpdate = document.getElementById("last-update");
 
-// 2. DOM एलिमेंट्स
-const statusDisplay = document.getElementById('ws-status');
-const listContainer = document.getElementById('crypto-list');
-const debugArea = document.getElementById('debug-area');
-
-// Helper function for mobile debugging logs
-function logToDebugArea(message) {
-    const p = document.createElement('p');
-    p.style.margin = '2px 0';
-    p.style.fontSize = '0.7em';
-    p.textContent = message;
-    
-    // केवल 20 लॉग्स रखें
-    if (debugArea.children.length > 20) {
-        debugArea.removeChild(debugArea.children[1]); 
-    }
-    debugArea.appendChild(p);
-    debugArea.scrollTop = debugArea.scrollHeight; 
-}
-
-let marketRates = {}; 
-
-// 3. REST API से डेटा Fetch करने का मुख्य फंक्शन
-async function fetchFundingRates() {
-    logToDebugArea(`🔄 Fetching data from REST API at ${new Date().toLocaleTimeString()}...`);
-    statusDisplay.textContent = "डेटा फ़ेच हो रहा...";
-    statusDisplay.setAttribute('data-status', 'connecting');
+    // Reset
+    tableBody.innerHTML = "";
+    loading.classList.remove("hidden");
+    noData.classList.add("hidden");
 
     try {
-        const response = await fetch(REST_API_URL);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        
+        const response = await fetch(API_URL);
         const data = await response.json();
-        
-        if (data && Array.isArray(data)) {
-            marketRates = {}; // डेटा स्टोर को रीसेट करें
-            let processedCount = 0;
-            
-            data.forEach(product => {
-                // केवल Perpetual Futures को प्रोसेस करें और सुनिश्चित करें कि फंडिंग रेट मौजूद है
-                if (product.perpetual === true && product.symbol && product.funding_rate !== undefined) {
-                    const symbol = product.symbol;
-                    const fundingRate = parseFloat(product.funding_rate);
-                    
-                    if (!isNaN(fundingRate)) {
-                        marketRates[symbol] = fundingRate;
-                        processedCount++;
-                    }
-                }
-            });
 
-            logToDebugArea(`✅ Data fetched successfully. Processed ${processedCount} symbols.`);
-            statusDisplay.textContent = `अंतिम अपडेट: ${new Date().toLocaleTimeString()}`;
-            statusDisplay.setAttribute('data-status', 'connected');
-            
-            // डेटा फ़ेच होने के तुरंत बाद डिस्प्ले अपडेट करें
-            refreshDisplay(); 
-
-        } else {
-            throw new Error("Invalid data format received.");
+        if (!data.result || data.result.length === 0) {
+            throw new Error("No data");
         }
 
+        const highFunding = data.result
+            .filter(item => {
+                const fundingRate = parseFloat(item.funding_rate || 0);
+                return Math.abs(fundingRate) >= THRESHOLD;
+            })
+            .sort((a, b) => Math.abs(parseFloat(b.funding_rate)) - Math.abs(parseFloat(a.funding_rate)));
+
+        if (highFunding.length === 0) {
+            noData.classList.remove("hidden");
+            tableBody.innerHTML = "";
+        } else {
+            highFunding.forEach(item => {
+                const fundingRate = parseFloat(item.funding_rate);
+                const ratePercent = (fundingRate * 100).toFixed(4);
+                const isPositive = fundingRate > 0;
+
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td data-label="Symbol">${item.symbol.replace("_PERP", "")}</td>
+                    <td data-label="Funding" class="${isPositive ? 'positive' : 'negative'}">
+                        ${isPositive ? "🟢 +" : "🔴"} ${ratePercent}%
+                    </td>
+                    <td data-label="Price">$${parseFloat(item.mark_price).toLocaleString()}</td>
+                    <td data-label="Next Funding">${item.time_to_funding || "Soon"}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        lastUpdate.textContent = new Date().toLocaleString('en-IN');
+        
     } catch (error) {
-        logToDebugArea(`❌ Fetch Error: ${error.message}.`);
-        statusDisplay.textContent = "कनेक्शन एरर";
-        statusDisplay.setAttribute('data-status', 'error');
+        tableBody.innerHTML = `<tr><td colspan="4">Error loading data 😓<br>${error.message}</td></tr>`;
+    } finally {
+        loading.classList.add("hidden");
     }
 }
 
-
-// 4. डिस्प्ले को अपडेट करने का फंक्शन
-function refreshDisplay() {
-    listContainer.innerHTML = ''; 
-    let alertFound = false;
-
-    // 0.50% की वास्तविक थ्रेशोल्ड
-    const currentThreshold = FUNDING_THRESHOLD;
-
-    for (const symbol in marketRates) {
-        const rate = marketRates[symbol];
-        const absRate = Math.abs(rate);
-        
-        // शर्त चेक करें
-        if (absRate >= currentThreshold) {
-            alertFound = true;
-            
-            const card = document.createElement('div');
-            const ratePercent = (rate * 100).toFixed(4) + '%'; 
-            
-            const rateClass = rate > 0 ? 'positive' : 'negative';
-            const cardClass = rate > 0 ? 'long' : 'short';
-            
-            card.className = `crypto-card ${cardClass}`;
+// Auto refresh every 1 minute
+fetchData(); // First load
+setInterval(fetchData, 60000);            card.className = `crypto-card ${cardClass}`;
             card.innerHTML = `
                 <div class="symbol">${symbol}</div>
                 <div class="rate">Funding Rate: <span class="${rateClass}">${ratePercent}</span></div>
