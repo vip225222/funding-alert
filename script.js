@@ -6,7 +6,7 @@
 // 1. कॉन्फ़िगरेशन
 // **** सबसे संभावित WebSocket URL ****
 const DELTA_WS_URL = "wss://socket.delta.exchange"; 
-const FUNDING_THRESHOLD = 0.0050; // 0.50% को डेसीमल फॉर्मेट (0.0050) में
+const FUNDING_THRESHOLD = 0.0001; // 0.50% को डेसीमल फॉर्मेट (0.0050) में
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 मिनट = 300,000 मिलीसेकंड
 
 // 2. DOM एलिमेंट्स
