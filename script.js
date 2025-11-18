@@ -5,7 +5,7 @@
 
 // 1. कॉन्फ़िगरेशन
 // अब API Key की कोई जरूरत नहीं है
-const API_URL = "https://api.delta.exchange/v2/products"; 
+const API_URL = "https://corsproxy.io/?https://api.delta.exchange/v2/products"; 
 const FUNDING_THRESHOLD = 0.0001; // TESTING THRESHOLD (0.01%) - बाद में 0.0050 कर दें
 const REFRESH_TIME = 5 * 60; // 5 minutes
 
