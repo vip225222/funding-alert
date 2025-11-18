@@ -2,45 +2,42 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Delta Funding Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delta High Funding Alert (±0.50%)</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <!-- CryptoJS library for signature (must load before script.js) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body>
-
-    <nav class="app-header">
-        <div class="logo-area">
-            <span class="logo-icon">⚡</span>
-            <h1>Funding<span class="highlight">Pro</span></h1>
-        </div>
-        <div class="status-badge" id="connection-status">
-            <span class="dot"></span> Connecting...
-        </div>
-    </nav>
-
-    <main class="dashboard">
+    <div class="container">
+        <h1>Delta Exchange - High Funding Rates</h1>
+        <p class="subtitle">Funding Rate > +0.50% या < -0.50% वाले कॉन्ट्रैक्ट्स Only</p>
         
-        <div class="summary-card">
-            <div class="stat-item">
-                <p class="label">Threshold</p>
-                <p class="value">0.50%</p>
-            </div>
-            <div class="stat-item">
-                <p class="label">Next Update</p>
-                <p class="value" id="countdown">5:00</p>
-            </div>
+        <div class="info">
+            <p>अंतिम अपडेट: <span id="last-update">Loading...</span></p>
+            <button onclick="fetchData()">Manual Refresh 🔄</button>
         </div>
 
-        <h3 class="section-title">High Alert Opportunities 🔥</h3>
+        <div id="loading">Delta Exchange से डेटा लोड हो रहा है...</div>
 
-        <div id="debug-log" style="display:none; color: #666; font-size: 10px; padding: 10px;"></div>
+        <table id="funding-table">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Funding Rate</th>
+                    <th>Mark Price</th>
+                    <th>Next Funding</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <!-- Rows yahan automatically aayenge -->
+            </tbody>
+        </table>
 
-        <div id="crypto-grid" class="grid-container">
-            <div class="loading-spinner">Fetching Market Data...</div>
+        <div id="no-data" class="no-data hidden">
+            <p>अभी कोई भी कॉन्ट्रैक्ट ±0.50% से बाहर नहीं है 😴</p>
         </div>
-
-    </main>
+    </div>
 
     <script src="script.js"></script>
 </body>
