@@ -1,109 +1,183 @@
-// Global variables
-let ws = null;
-let autoRefreshInterval = null;
-let reconnectAttempts = 0;
-let maxReconnectAttempts = 5;
-let allCryptoData = [];
-let isConnected = false;
+// Simple and working solution
+let autoInterval;
+let countdown = 60;
 
-// Update UI status
-function updateConnectionStatus(message, type = 'loading') {
-    const statusEl = document.getElementById('connectionStatus');
-    const indicator = document.getElementById('statusIndicator');
-    const wsStatus = document.getElementById('wsStatus');
+// Main function to load data
+async function loadData() {
+    const btn = document.getElementById('refreshBtn');
+    const status = document.getElementById('status');
+    const message = document.getElementById('message');
+    const container = document.getElementById('cryptoContainer');
     
-    statusEl.textContent = message;
-    indicator.className = `status-indicator ${type}`;
+    // Disable button
+    btn.disabled = true;
+    btn.textContent = '⏳ Loading...';
+    status.textContent = 'Loading...';
+    status.style.color = '#fbbf24';
+    message.innerHTML = '<div class="loading">🔄 Fetching data from Delta Exchange...</div>';
+    container.innerHTML = '';
     
-    if (type === 'success') {
-        wsStatus.textContent = '🟢';
-    } else if (type === 'error') {
-        wsStatus.textContent = '🔴';
-    } else {
-        wsStatus.textContent = '🟡';
-    }
-}
-
-// Update loading message
-function updateLoadingMessage(mainText, detailText) {
-    const loadingText = document.getElementById('loadingText');
-    const loadingDetail = document.getElementById('loadingDetail');
+    console.log('[START] Loading data...');
     
-    if (loadingText) loadingText.textContent = mainText;
-    if (loadingDetail) loadingDetail.textContent = detailText;
-}
-
-// Show success banner
-function showSuccessBanner(message) {
-    const warningMsg = document.getElementById('warningMessage');
-    warningMsg.innerHTML = `
-        <div class="warning success-banner">
-            ✅ ${message}
-        </div>
-    `;
-    setTimeout(() => {
-        warningMsg.innerHTML = '';
-    }, 5000);
-}
-
-// Show error message
-function showError(message) {
-    const errorMsg = document.getElementById('errorMessage');
-    errorMsg.innerHTML = `
-        <div class="error">
-            ⚠️ ${message}
-        </div>
-    `;
-}
-
-// Fetch data via REST API (fallback method)
-async function fetchViaAPI() {
-    console.log('[API] Fetching via REST API...');
-    updateLoadingMessage('📡 Fetching via REST API...', 'Using HTTP fallback');
-    
-    const proxies = [
-        { name: 'AllOrigins', url: (api) => `https://api.allorigins.win/raw?url=${encodeURIComponent(api)}` },
-        { name: 'CORSProxy', url: (api) => `https://corsproxy.io/?${encodeURIComponent(api)}` }
-    ];
-    
-    for (let i = 0; i < proxies.length; i++) {
-        const proxy = proxies[i];
-        try {
-            console.log(`[API] Trying ${proxy.name}...`);
-            updateLoadingMessage(`🔄 Trying ${proxy.name}...`, `Attempt ${i + 1}/${proxies.length}`);
-            
-            const apiUrl = 'https://api.delta.exchange/v2/tickers';
-            const proxyUrl = proxy.url(apiUrl);
-            
-            const response = await fetch(proxyUrl, {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' },
-                signal: AbortSignal.timeout(15000)
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            if (!data.result || !Array.isArray(data.result)) {
-                throw new Error('Invalid data format');
-            }
-            
-            console.log(`[API] ✅ Success with ${proxy.name}`);
-            allCryptoData = data.result;
-            processAndDisplayData();
-            
-            updateConnectionStatus(`Connected via ${proxy.name}`, 'success');
-            showSuccessBanner(`<strong>Connected!</strong><br><small>Using: ${proxy.name} REST API</small>`);
-            
-            document.getElementById('loadingMessage').style.display = 'none';
-            return true;
-            
-        } catch (error) {
-            console.error(`[API] ${proxy.name} failed:`, error.message);
+    try {
+        // Direct API call (No CORS proxy needed for GitHub Pages)
+        const response = await fetch('https://api.delta.exchange/v2/tickers');
+        
+        if (!response.ok) {
+            throw new Error('API Error: ' + response.status);
         }
+        
+        const data = await response.json();
+        console.log('[SUCCESS] Data received:', data.result?.length, 'items');
+        
+        if (!data.result || !Array.isArray(data.result)) {
+            throw new Error('Invalid data format');
+        }
+        
+        // Filter cryptos with funding rate >= 0.50% or <= -0.50%
+        const filtered = data.result.filter(crypto => {
+            const rate = parseFloat(crypto.funding_rate) * 100;
+            return Math.abs(rate) >= 0.50;
+        });
+        
+        console.log('[FILTERED]', filtered.length, 'cryptos above threshold');
+        
+        // Display results
+        displayCryptos(filtered);
+        updateStats(filtered);
+        updateTime();
+        
+        // Success message
+        status.textContent = 'Connected ✓';
+        status.style.color = '#10b981';
+        message.innerHTML = `<div class="success">✅ Success! Found ${filtered.length} cryptos (${new Date().toLocaleTimeString()})</div>`;
+        
+        setTimeout(() => {
+            message.innerHTML = '';
+        }, 5000);
+        
+    } catch (error) {
+        console.error('[ERROR]', error);
+        
+        // Show error
+        status.textContent = 'Error ✗';
+        status.style.color = '#ef4444';
+        message.innerHTML = `
+            <div class="error">
+                ⚠️ <strong>Error:</strong> ${error.message}<br>
+                <small>Please check console (F12) for details</small>
+            </div>
+        `;
+        
+        container.innerHTML = '<div class="no-data">❌ Failed to load data. Please refresh.</div>';
+    }
+    
+    // Re-enable button
+    btn.disabled = false;
+    btn.textContent = '🔄 Refresh';
+    resetCountdown();
+}
+
+// Display cryptos
+function displayCryptos(cryptos) {
+    const container = document.getElementById('cryptoContainer');
+    
+    if (cryptos.length === 0) {
+        container.innerHTML = '<div class="no-data">📭 No cryptos found above 0.50% threshold</div>';
+        return;
+    }
+    
+    // Sort by absolute funding rate (highest first)
+    cryptos.sort((a, b) => {
+        const rateA = Math.abs(parseFloat(a.funding_rate) * 100);
+        const rateB = Math.abs(parseFloat(b.funding_rate) * 100);
+        return rateB - rateA;
+    });
+    
+    // Create cards
+    container.innerHTML = cryptos.map(crypto => {
+        const rate = parseFloat(crypto.funding_rate) * 100;
+        const isPositive = rate > 0;
+        const sign = isPositive ? '+' : '';
+        
+        return `
+            <div class="crypto-card ${isPositive ? 'positive' : 'negative'}">
+                <div class="crypto-header">
+                    <div class="crypto-symbol">${crypto.symbol}</div>
+                    <div class="funding-rate ${isPositive ? 'positive' : 'negative'}">
+                        ${sign}${rate.toFixed(4)}%
+                    </div>
+                </div>
+                <div class="crypto-info">
+                    <strong>Price:</strong> $${parseFloat(crypto.mark_price).toFixed(2)}<br>
+                    <strong>Volume 24h:</strong> $${parseFloat(crypto.turnover_24h).toLocaleString()}<br>
+                    <strong>Type:</strong> ${crypto.contract_type || 'Perpetual'}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Update statistics
+function updateStats(cryptos) {
+    const positive = cryptos.filter(c => parseFloat(c.funding_rate) > 0.005).length;
+    const negative = cryptos.filter(c => parseFloat(c.funding_rate) < -0.005).length;
+    
+    document.getElementById('totalCount').textContent = cryptos.length;
+    document.getElementById('positiveCount').textContent = positive;
+    document.getElementById('negativeCount').textContent = negative;
+}
+
+// Update time
+function updateTime() {
+    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+}
+
+// Countdown timer
+function resetCountdown() {
+    countdown = 60;
+    updateCountdown();
+}
+
+function updateCountdown() {
+    document.getElementById('nextUpdate').textContent = countdown + 's';
+    if (countdown > 0) countdown--;
+}
+
+// Auto-refresh every 60 seconds
+function startAutoRefresh() {
+    if (autoInterval) clearInterval(autoInterval);
+    
+    // Main refresh
+    setInterval(() => {
+        console.log('[AUTO-REFRESH] Reloading...');
+        loadData();
+    }, 60000); // 60 seconds
+    
+    // Countdown update
+    setInterval(updateCountdown, 1000); // 1 second
+    
+    console.log('[AUTO-REFRESH] Enabled (every 60 seconds)');
+}
+
+// Initialize on page load
+window.addEventListener('load', () => {
+    console.log('=================================');
+    console.log('[INIT] Delta Exchange Monitor');
+    console.log('[TIME]', new Date().toLocaleString());
+    console.log('=================================');
+    
+    // Load data immediately
+    loadData();
+    
+    // Start auto-refresh
+    startAutoRefresh();
+});
+
+// Log when leaving
+window.addEventListener('beforeunload', () => {
+    console.log('[EXIT] Closing...');
+});        }
     }
     
     // All methods failed
