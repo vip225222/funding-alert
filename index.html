@@ -3,34 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Delta High Funding ±0.50% (No API Key)</title>
+    <title>High Funding Alert ±0.50% (Bybit - Similar to Delta)</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>Delta Exchange High Funding Alert</h1>
-        <p class="subtitle">Funding Rate ±0.50% से ज्यादा वाले Coins Only • No API Key</p>
+        <h1>High Funding Rate Alert (±0.50%)</h1>
+        <p class="subtitle">Bybit Perpetual • Delta ke similar coins • No API Key Needed</p>
         
         <div class="info">
             <p>Last Update: <span id="last-update">-</span></p>
-            <button onclick="fetchData()">Refresh Now 🔄</button>
+            <button onclick="fetchData()">Refresh 🔄</button>
         </div>
 
-        <div id="loading">Coinglass से Delta का डेटा लोड हो रहा है...</div>
+        <div id="loading">Bybit se data la raha hoon...</div>
 
         <table id="funding-table">
             <thead>
                 <tr>
                     <th>Coin</th>
                     <th>Funding Rate</th>
-                    <th>Status</th>
+                    <th>Price</th>
+                    <th>Next Funding</th>
                 </tr>
             </thead>
             <tbody id="table-body"></tbody>
         </table>
 
         <div id="no-data" class="no-data hidden">
-            <p>अभी कोई coin ±0.50% funding rate cross नहीं कर रहा 😴</p>
+            <p>Abhi koi coin ±0.50% cross nahi kar raha 😴</p>
         </div>
     </div>
 
