@@ -3,55 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Delta Exchange - Funding Rate Monitor</title>
+    <title>Delta Exchange - Funding Monitor</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>📊 Delta Exchange Funding Monitor</h1>
-            <p>Real-time WebSocket Connection</p>
+            <p>0.50% se upar ya niche ke Funding Rates</p>
         </div>
 
         <div class="stats">
             <div class="stat-card">
                 <h3>Total Cryptos</h3>
-                <div class="value" id="totalCount">-</div>
+                <div class="value" id="totalCount">0</div>
             </div>
             <div class="stat-card">
                 <h3>Positive (>0.50%)</h3>
-                <div class="value" id="positiveCount" style="color: #10b981;">-</div>
+                <div class="value" id="positiveCount" style="color: #10b981;">0</div>
             </div>
             <div class="stat-card">
                 <h3>Negative (<-0.50%)</h3>
-                <div class="value" id="negativeCount" style="color: #ef4444;">-</div>
-            </div>
-            <div class="stat-card">
-                <h3>Connection</h3>
-                <div class="value" id="wsStatus" style="font-size: 1.5em;">🔄</div>
+                <div class="value" id="negativeCount" style="color: #ef4444;">0</div>
             </div>
         </div>
 
         <div class="controls">
             <div class="update-info">
-                <strong>Status:</strong> 
-                <span id="connectionStatus">Starting...</span>
-                <span class="status-indicator" id="statusIndicator"></span><br>
+                <strong>Status:</strong> <span id="status">Ready</span><br>
                 <strong>Last Update:</strong> <span id="lastUpdate">---</span><br>
-                <strong>Auto-refresh:</strong> <span id="nextUpdate">Every 60s</span>
+                <strong>Next:</strong> <span id="nextUpdate">60s</span>
             </div>
-            <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()">
-                🔄 Refresh Now
+            <button class="refresh-btn" id="refreshBtn" onclick="loadData()">
+                🔄 Refresh
             </button>
         </div>
 
-        <div id="warningMessage"></div>
-        <div id="errorMessage"></div>
-        <div id="loadingMessage" class="loading">
-            <div class="spinner"></div>
-            <p id="loadingText">🚀 Connecting to Delta Exchange...</p>
-            <small id="loadingDetail">Initializing WebSocket connection</small>
-        </div>
+        <div id="message"></div>
         <div id="cryptoContainer" class="crypto-grid"></div>
     </div>
 
