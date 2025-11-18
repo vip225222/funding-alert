@@ -1,9 +1,9 @@
-const THRESHOLD = 0.0050; // 0.50% = 0.0050
+const THRESHOLD = 0.0050; // 0.50%
 
 async function fetchData() {
-    const tableBody  = document.getElementById("table-body");
-    const loading    = document.getElementById("loading");
-    const noData     = document.getElementById("no-data");
+    const tableBody = document.getElementById("table-body");
+    const loading = document.getElementById("loading");
+    const noData = document.getElementById("no-data");
     const lastUpdate = document.getElementById("last-update");
 
     tableBody.innerHTML = "";
@@ -11,27 +11,24 @@ async function fetchData() {
     noData.classList.add("hidden");
 
     try {
-        const response = await fetch("https://open-api.coinglass.com/public/v2/funding_rates?exchange=delta&interval=8h");
-        
-        if (!response.ok) throw new Error("Network error");
-
+        const response = await fetch("https://api.bybit.com/v5/market/tickers?category=linear");
         const data = await response.json();
 
-        if (data.code !== "0") throw new Error("API response error");
+        if (data.retCode !== 0) throw new Error("API Error");
 
-        const deltaList = data.data.find(item => item.exchangeName === "Delta")?.fundingRateList || [];
-
-        const highFunding = deltaList
-            .filter(coin => Math.abs(parseFloat(coin.fundingRate)) >= THRESHOLD)
+        const highFunding = data.result.list
+            .filter(item => item.symbol.endsWith("USDT"))
+            .filter(item => Math.abs(parseFloat(item.fundingRate)) >= THRESHOLD)
             .sort((a, b) => Math.abs(parseFloat(b.fundingRate)) - Math.abs(parseFloat(a.fundingRate)));
 
         if (highFunding.length === 0) {
             noData.classList.remove("hidden");
         } else {
-            highFunding.forEach(coin => {
-                const rate = parseFloat(coin.fundingRate);
+            highFunding.forEach(item => {
+                const rate = parseFloat(item.fundingRate);
                 const percent = (rate * 100).toFixed(4);
-                const symbol = coin.symbol.replace("PERP", "");
+                const symbol = item.symbol.replace("USDT", "");
+                const price = parseFloat(item.lastPrice).toLocaleString();
 
                 const row = document.createElement("tr");
                 row.innerHTML = `
@@ -39,7 +36,8 @@ async function fetchData() {
                     <td class="${rate > 0 ? "positive" : "negative"}">
                         ${rate > 0 ? "🟢 +" : "🔴 "} ${percent}%
                     </td>
-                    <td>${rate > 0 ? "Longs → Shorts" : "Shorts → Longs"}</td>
+                    <td>$${price}</td>
+                    <td>${new Date(parseInt(item.nextFundingTime)).toLocaleString('en-IN')}</td>
                 `;
                 tableBody.appendChild(row);
             });
@@ -48,13 +46,11 @@ async function fetchData() {
         lastUpdate.textContent = new Date().toLocaleString("en-IN");
 
     } catch (error) {
-        tableBody.innerHTML = `<tr><td colspan="3">Error 😓<br>Retry in 1 minute...</td></tr>`;
-        console.error(error);
+        tableBody.innerHTML = `<tr><td colspan="4">Error 😓<br>Retry in 1 min...</td></tr>`;
     } finally {
         loading.classList.add("hidden");
     }
 }
 
-// Start karo
 fetchData();
-setInterval(fetchData, 60000); // हर मिनट अपडेट
+setInterval(fetchData, 60000);
