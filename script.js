@@ -1,41 +1,64 @@
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-    color: white; min-height: 100vh;
+const THRESHOLD = 0.0050; // 0.50%
+
+async function fetchData() {
+    const tableBody = document.getElementById("table-body");
+    const loading = document.getElementById("loading");
+    const noData = document.getElementById("no-data");
+    const lastUpdate = document.getElementById("last-update");
+
+    tableBody.innerHTML = "";
+    loading.classList.remove("hidden");
+    noData.classList.add("hidden");
+
+    try {
+        // Step 1: Funding rates
+        const fundingRes = await fetch("https://fapi.binance.com/fapi/v1/premiumIndex");
+        const fundingData = await fundingRes.json();
+
+        // Step 2: Current prices
+        const priceRes = await fetch("https://fapi.binance.com/fapi/v1/ticker/price");
+        const priceData = await priceRes.json();
+        const priceMap = {};
+        priceData.forEach(p => priceMap[p.symbol] = p.price);
+
+        const highFunding = fundingData
+            .filter(item => item.symbol.endsWith("USDT")) // Only USDT perpetuals
+            .filter(item => Math.abs(parseFloat(item.lastFundingRate)) >= THRESHOLD)
+            .sort((a, b) => Math.abs(parseFloat(b.lastFundingRate)) - Math.abs(parseFloat(a.lastFundingRate)));
+
+        if (highFunding.length === 0) {
+            noData.classList.remove("hidden");
+        } else {
+            highFunding.forEach(item => {
+                const rate = parseFloat(item.lastFundingRate);
+                const ratePercent = (rate * 100).toFixed(4);
+                const symbol = item.symbol.replace("USDT", "");
+                const price = priceMap[item.symbol] || "N/A";
+                const nextTime = new Date(item.nextFundingTime).toLocaleString('en-IN');
+
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td data-label="Symbol">${symbol}</td>
+                    <td data-label="Funding" class="${rate > 0 ? 'positive' : 'negative'}">
+                        ${rate > 0 ? "🟢 +" : "🔴"} ${ratePercent}%
+                    </td>
+                    <td data-label="Price">$${parseFloat(price).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td data-label="Next Funding">${nextTime}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        lastUpdate.textContent = new Date().toLocaleString('en-IN');
+
+    } catch (error) {
+        tableBody.innerHTML = `<tr><td colspan="4">Error 😓<br>Retry ho raha hai...</td></tr>`;
+        console.error(error);
+    } finally {
+        loading.classList.add("hidden");
+    }
 }
-.container { max-width: 1100px; margin: 0 auto; padding: 20px; }
-h1 {
-    text-align: center; margin-bottom: 10px; font-size: 2.5rem;
-    background: linear-gradient(to right, #f0b90b, #f3ec78);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-}
-.subtitle { text-align: center; color: #f0b90b; margin-bottom: 20px; font-size: 1.2rem; }
-.info { text-align: center; margin-bottom: 20px; }
-button {
-    padding: 10px 20px; background: #f0b90b; border: none; border-radius: 5px;
-    color: black; font-weight: bold; cursor: pointer;
-}
-button:hover { background: #d4a017; }
-#loading { text-align: center; font-size: 1.2rem; margin: 40px; }
-table {
-    width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.1);
-    border-radius: 10px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-}
-th { background: #f0b90b; color: black; padding: 15px; text-align: center; }
-td { padding: 15px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
-tr:hover { background: rgba(255,255,255,0.1); }
-.positive { color: #00ff88; font-weight: bold; }
-.negative { color: #ff4444; font-weight: bold; }
-.no-data {
-    text-align: center; font-size: 1.5rem; margin-top: 50px; padding: 40px;
-    background: rgba(255,255,255,0.1); border-radius: 10px;
-}
-.hidden { display: none; }
-@media (max-width: 768px) {
-    table, thead, tbody, th, td, tr { display: block; }
-    thead tr { display: none; }
-    tr { margin-bottom: 15px; border: 1px solid #444; border-radius: 8px; }
-    td { text-align: right; padding-left: 50%; position: relative; }
-    td::before { content: attr(data-label); position: absolute; left: 15px; font-weight: bold; }
-}
+
+// Start
+fetchData();
+setInterval(fetchData, 60000); // Har minute update
