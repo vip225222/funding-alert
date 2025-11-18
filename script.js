@@ -11,30 +11,28 @@ async function fetchData() {
     noData.classList.add("hidden");
 
     try {
-        // Step 1: Funding rates
-        const fundingRes = await fetch("https://fapi.binance.com/fapi/v1/premiumIndex");
-        const fundingData = await fundingRes.json();
+        // Coinglass public API - Delta Exchange ke exact rates
+        const response = await fetch("https://open-api.coinglass.com/public/v2/funding_rates?exchange=delta&interval=8h", {
+            headers: { "accept": "application/json" }
+        });
 
-        // Step 2: Current prices
-        const priceRes = await fetch("https://fapi.binance.com/fapi/v1/ticker/price");
-        const priceData = await priceRes.json();
-        const priceMap = {};
-        priceData.forEach(p => priceMap[p.symbol] = p.price);
+        const data = await response.json();
 
-        const highFunding = fundingData
-            .filter(item => item.symbol.endsWith("USDT")) // Only USDT perpetuals
-            .filter(item => Math.abs(parseFloat(item.lastFundingRate)) >= THRESHOLD)
-            .sort((a, b) => Math.abs(parseFloat(b.lastFundingRate)) - Math.abs(parseFloat(a.lastFundingRate)));
+        if (data.code !== "0") throw new Error("API Error");
+
+        const deltaList = data.data.find(d => d.exchangeName === "Delta")?.fundingRateList || [];
+
+        const highFunding = deltaList
+            .filter(item => Math.abs(parseFloat(item.fundingRate)) >= THRESHOLD)
+            .sort((a, b) => Math.abs(parseFloat(b.fundingRate)) - Math.abs(parseFloat(a.fundingRate)));
 
         if (highFunding.length === 0) {
             noData.classList.remove("hidden");
         } else {
             highFunding.forEach(item => {
-                const rate = parseFloat(item.lastFundingRate);
+                const rate = parseFloat(item.fundingRate);
                 const ratePercent = (rate * 100).toFixed(4);
-                const symbol = item.symbol.replace("USDT", "");
-                const price = priceMap[item.symbol] || "N/A";
-                const nextTime = new Date(item.nextFundingTime).toLocaleString('en-IN');
+                const symbol = item.symbol.replace("PERP", "");
 
                 const row = document.createElement("tr");
                 row.innerHTML = `
@@ -42,8 +40,7 @@ async function fetchData() {
                     <td data-label="Funding" class="${rate > 0 ? 'positive' : 'negative'}">
                         ${rate > 0 ? "🟢 +" : "🔴"} ${ratePercent}%
                     </td>
-                    <td data-label="Price">$${parseFloat(price).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td data-label="Next Funding">${nextTime}</td>
+                    <td data-label="Price">Live on Delta</td>
                 `;
                 tableBody.appendChild(row);
             });
@@ -52,8 +49,7 @@ async function fetchData() {
         lastUpdate.textContent = new Date().toLocaleString('en-IN');
 
     } catch (error) {
-        tableBody.innerHTML = `<tr><td colspan="4">Error 😓<br>Retry ho raha hai...</td></tr>`;
-        console.error(error);
+        tableBody.innerHTML = `<tr><td colspan="3">Error 😓<br>Retry in 1 min...</td></tr>`;
     } finally {
         loading.classList.add("hidden");
     }
