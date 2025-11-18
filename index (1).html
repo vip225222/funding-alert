@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delta Funding Rate Monitor (0.50% Alert)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>🚨 डेल्टा एक्सचेंज फंडिंग रेट मॉनिटर 🚨</h1>
+        <p>केवल वही Crypto दिखाए जाएंगे जिनका Funding Rate **0.50%** के ऊपर या नीचे (जैसे, > +0.50% या < -0.50%) है।</p>
+        <p class="status">WebSocket स्थिति: <span id="ws-status">कनेक्टिंग...</span></p>
+        <p>स्क्रीनिंग अंतराल: <span id="refresh-interval">5 मिनट</span></p>
+    </header>
+
+    <main>
+        <h2>📈 अलर्ट पर मौजूद Crypto (5 मिनट में अपडेट)</h2>
+        <div id="crypto-list">
+            <p>WebSocket से डेटा आने का इंतज़ार है...</p>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Funding Monitor</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
