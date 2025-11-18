@@ -16,22 +16,23 @@
         <div class="stats">
             <div class="stat-card">
                 <h3>Total Cryptos</h3>
-                <div class="value" id="totalCount">0</div>
+                <div class="value" id="totalCount">-</div>
             </div>
             <div class="stat-card">
                 <h3>Positive (>0.50%)</h3>
-                <div class="value" id="positiveCount" style="color: #10b981;">0</div>
+                <div class="value" id="positiveCount" style="color: #10b981;">-</div>
             </div>
             <div class="stat-card">
                 <h3>Negative (<-0.50%)</h3>
-                <div class="value" id="negativeCount" style="color: #ef4444;">0</div>
+                <div class="value" id="negativeCount" style="color: #ef4444;">-</div>
             </div>
         </div>
 
         <div class="controls">
             <div class="update-info">
-                <strong>Last Update:</strong> <span id="lastUpdate">Loading...</span>
+                <strong>Status:</strong> <span id="connectionStatus">Connecting...</span>
                 <span class="status-indicator" id="statusIndicator"></span><br>
+                <strong>Last Update:</strong> <span id="lastUpdate">---</span><br>
                 <strong>Next Update:</strong> <span id="nextUpdate">60s</span>
             </div>
             <button class="refresh-btn" id="refreshBtn" onclick="fetchData()">
@@ -41,9 +42,10 @@
 
         <div id="warningMessage"></div>
         <div id="errorMessage"></div>
-        <div id="loadingMessage" class="loading">
+        <div id="loadingMessage" class="loading" style="display: block;">
             <div class="spinner"></div>
-            <p>Data load ho raha hai...</p>
+            <p id="loadingText">🚀 Starting...</p>
+            <small id="loadingDetail">Initializing connection</small>
         </div>
         <div id="cryptoContainer" class="crypto-grid"></div>
     </div>
