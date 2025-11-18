@@ -1,26 +1,68 @@
+:root {
+    --bg-color: #1a1a2e; /* Deep dark blue */
+    --text-color: #e4e4e4;
+    --primary-color: #00bcd4; /* Cyan/Teal */
+    --accent-color: #ff9800; /* Orange accent */
+    --card-bg: #272740;
+    --green-alert: #4caf50;
+    --red-alert: #f44336;
+}
+
 body {
-    font-family: Arial, sans-serif;
-    background-color: #121212;
-    color: #e0e0e0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
     margin: 0;
     padding: 0;
     text-align: center;
+    line-height: 1.6;
 }
 
 header {
-    background-color: #1f1f1f;
-    padding: 20px;
-    border-bottom: 3px solid #00aaff;
+    background-color: #16162a;
+    padding: 30px 20px;
+    border-bottom: 4px solid var(--primary-color);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
 }
 
 h1 {
-    color: #ffcc00;
+    color: var(--accent-color);
+    font-size: 2.2em;
+    margin-bottom: 5px;
 }
+
+/* Status Bar */
+.status-bar {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background-color: #272740;
+    padding: 10px 20px;
+    font-size: 0.9em;
+    border-bottom: 1px solid #3a3a5a;
+}
+
+#ws-status {
+    font-weight: bold;
+    transition: color 0.3s;
+}
+
+#ws-status[data-status="connected"] { color: var(--green-alert); }
+#ws-status[data-status="connecting"] { color: var(--accent-color); }
+#ws-status[data-status="error"] { color: var(--red-alert); }
 
 main {
     padding: 20px;
 }
 
+h2 {
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 5px;
+    margin-top: 30px;
+}
+
+/* Crypto List Cards */
 #crypto-list {
     display: flex;
     flex-wrap: wrap;
@@ -30,45 +72,78 @@ main {
 }
 
 .crypto-card {
-    background-color: #2a2a2a;
-    border-radius: 8px;
-    padding: 15px;
-    width: 250px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    background-color: var(--card-bg);
+    border-radius: 12px;
+    padding: 20px;
+    width: 300px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
     text-align: left;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.crypto-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.7);
 }
 
 .crypto-card.long {
-    border-left: 5px solid #00c853; /* Green for Positive Rate */
+    border: 1px solid var(--green-alert);
+    border-left: 5px solid var(--green-alert);
 }
 
 .crypto-card.short {
-    border-left: 5px solid #ff1744; /* Red for Negative Rate */
+    border: 1px solid var(--red-alert);
+    border-left: 5px solid var(--red-alert);
 }
 
 .symbol {
-    font-size: 1.5em;
-    font-weight: bold;
+    font-size: 1.8em;
+    font-weight: 700;
+    color: var(--text-color);
     margin-bottom: 5px;
 }
 
 .rate {
-    font-size: 1.2em;
+    font-size: 1.3em;
+    margin-top: 10px;
 }
 
 .positive {
-    color: #00c853; /* Green */
-}
-
-.negative {
-    color: #ff1744; /* Red */
-}
-
-.status #ws-status {
+    color: var(--green-alert);
     font-weight: bold;
 }
 
-/* Status Colors */
-#ws-status[data-status="connected"] { color: #00c853; }
-#ws-status[data-status="connecting"] { color: #ffcc00; }
-#ws-status[data-status="error"] { color: #ff1744; }
+.negative {
+    color: var(--red-alert);
+    font-weight: bold;
+}
+
+/* Debug Panel */
+.debug-panel {
+    text-align: left;
+    background-color: #1f1f33;
+    padding: 10px 20px;
+    margin: 10px auto;
+    width: 90%;
+    max-width: 800px;
+    max-height: 150px;
+    overflow-y: scroll;
+    border: 1px dashed #5a5a82;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 0.8em;
+}
+
+.debug-panel h3 {
+    color: var(--primary-color);
+    margin: 0 0 5px 0;
+}
+
+/* Footer */
+footer {
+    padding: 15px;
+    background-color: #16162a;
+    margin-top: 40px;
+    font-size: 0.8em;
+    border-top: 1px solid #3a3a5a;
+}
