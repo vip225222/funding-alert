@@ -1,37 +1,41 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Delta Funding Rate Monitor - REST API</title>
+    <title>Delta High Funding Rates Alert (±0.50%)</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <h1>🚨 डेल्टा एक्सचेंज फंडिंग अलर्ट 🚨</h1>
-        <p>REST API से डेटा फ़ेच किया जा रहा है। केवल वही Crypto दिखाए जाएंगे जिनका Funding Rate **0.50%** के ऊपर या नीचे है।</p>
-    </header>
-
-    <div class="status-bar">
-        <p class="status">स्थिति: <span id="ws-status" data-status="connecting">कनेक्ट हो रहा...</span></p>
-        <p class="interval">अपडेट अंतराल: 5 मिनट</p>
-    </div>
-
-    <div id="debug-area" class="debug-panel">
-        <h3>Live Log (Debugging)</h3>
-        <p>डेटा फ़ेचिंग लॉग यहाँ दिखेंगे...</p>
-    </div>
-
-    <main>
-        <h2>📈 अलर्ट पर मौजूद Crypto (0.50% Threshold)</h2>
-        <div id="crypto-list">
-            <p class="loading-message">डेटा फ़ेच हो रहा है, कृपया इंतज़ार करें...</p>
+    <div class="container">
+        <h1>Delta Exchange - High Funding Rates Alert</h1>
+        <p class="subtitle">Funding Rate > +0.50% या < -0.50% वाले कॉन्ट्रैक्ट्स</p>
+        
+        <div class="info">
+            <p>अंतिम अपडेट: <span id="last-update">Loading...</span></p>
+            <button onclick="fetchData()">Manual Refresh</button>
         </div>
-    </main>
 
-    <footer>
-        <p>&copy; 2025 Delta Monitor</p>
-    </footer>
+        <div id="loading">Loading data from Delta Exchange...</div>
+
+        <table id="funding-table">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Funding Rate</th>
+                    <th>Mark Price</th>
+                    <th>Time Left</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <!-- Data yahan fill hoga -->
+            </tbody>
+        </table>
+
+        <div id="no-data" class="no-data hidden">
+            <p>अभी कोई भी कॉन्ट्रैक्ट ±0.50% funding rate के बाहर नहीं है 😴</p>
+        </div>
+    </div>
 
     <script src="script.js"></script>
 </body>
