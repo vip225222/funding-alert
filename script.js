@@ -9,7 +9,7 @@ const API_KEY = "yL8vA2msxSEBtlLwqHvTKE4iDfqNWb"; // <--- अपनी Key य�
 // ==========================================
 
 const API_URL = "https://api.delta.exchange/v2/products";
-const THRESHOLD = 0.0001; // 0.50%
+const THRESHOLD = 0.0001; // 0.01%
 const REFRESH_TIME = 5 * 60; // 5 minutes
 
 // Elements
