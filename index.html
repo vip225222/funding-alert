@@ -3,20 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Delta High Funding Rates Alert (±0.50%)</title>
+    <title>Delta High Funding Alert (±0.50%)</title>
     <link rel="stylesheet" href="style.css">
+    <!-- CryptoJS library for signature (must load before script.js) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>Delta Exchange - High Funding Rates Alert</h1>
-        <p class="subtitle">Funding Rate > +0.50% या < -0.50% वाले कॉन्ट्रैक्ट्स</p>
+        <h1>Delta Exchange - High Funding Rates</h1>
+        <p class="subtitle">Funding Rate > +0.50% या < -0.50% वाले कॉन्ट्रैक्ट्स Only</p>
         
         <div class="info">
             <p>अंतिम अपडेट: <span id="last-update">Loading...</span></p>
-            <button onclick="fetchData()">Manual Refresh</button>
+            <button onclick="fetchData()">Manual Refresh 🔄</button>
         </div>
 
-        <div id="loading">Loading data from Delta Exchange...</div>
+        <div id="loading">Delta Exchange से डेटा लोड हो रहा है...</div>
 
         <table id="funding-table">
             <thead>
@@ -24,16 +26,16 @@
                     <th>Symbol</th>
                     <th>Funding Rate</th>
                     <th>Mark Price</th>
-                    <th>Time Left</th>
+                    <th>Next Funding</th>
                 </tr>
             </thead>
             <tbody id="table-body">
-                <!-- Data yahan fill hoga -->
+                <!-- Rows yahan automatically aayenge -->
             </tbody>
         </table>
 
         <div id="no-data" class="no-data hidden">
-            <p>अभी कोई भी कॉन्ट्रैक्ट ±0.50% funding rate के बाहर नहीं है 😴</p>
+            <p>अभी कोई भी कॉन्ट्रैक्ट ±0.50% से बाहर नहीं है 😴</p>
         </div>
     </div>
 
