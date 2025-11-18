@@ -1,28 +1,30 @@
-let autoRefreshInterval;
-let countdownInterval;
-let secondsRemaining = 60;
-let retryCount = 0;
-const maxRetries = 3;
+// Global variables
+let ws = null;
+let autoRefreshInterval = null;
+let reconnectAttempts = 0;
+let maxReconnectAttempts = 5;
+let allCryptoData = [];
+let isConnected = false;
 
-// Multiple CORS proxies
-const proxies = [
-    { name: 'AllOrigins', url: (api) => `https://api.allorigins.win/raw?url=${encodeURIComponent(api)}` },
-    { name: 'CORSProxy', url: (api) => `https://corsproxy.io/?${encodeURIComponent(api)}` },
-    { name: 'ThingProxy', url: (api) => `https://thingproxy.freeboard.io/fetch/${api}` }
-];
-
-let currentProxyIndex = 0;
-
-// Update connection status in UI
+// Update UI status
 function updateConnectionStatus(message, type = 'loading') {
     const statusEl = document.getElementById('connectionStatus');
     const indicator = document.getElementById('statusIndicator');
+    const wsStatus = document.getElementById('wsStatus');
     
     statusEl.textContent = message;
     indicator.className = `status-indicator ${type}`;
+    
+    if (type === 'success') {
+        wsStatus.textContent = '🟢';
+    } else if (type === 'error') {
+        wsStatus.textContent = '🔴';
+    } else {
+        wsStatus.textContent = '🟡';
+    }
 }
 
-// Update loading messages
+// Update loading message
 function updateLoadingMessage(mainText, detailText) {
     const loadingText = document.getElementById('loadingText');
     const loadingDetail = document.getElementById('loadingDetail');
@@ -31,38 +33,44 @@ function updateLoadingMessage(mainText, detailText) {
     if (loadingDetail) loadingDetail.textContent = detailText;
 }
 
-// Main fetch function
-async function fetchData() {
-    const btn = document.getElementById('refreshBtn');
-    const loadingMsg = document.getElementById('loadingMessage');
-    const errorMsg = document.getElementById('errorMessage');
+// Show success banner
+function showSuccessBanner(message) {
     const warningMsg = document.getElementById('warningMessage');
-    const container = document.getElementById('cryptoContainer');
+    warningMsg.innerHTML = `
+        <div class="warning success-banner">
+            ✅ ${message}
+        </div>
+    `;
+    setTimeout(() => {
+        warningMsg.innerHTML = '';
+    }, 5000);
+}
 
-    // Reset UI
-    btn.disabled = true;
-    btn.textContent = '⏳ Loading...';
-    loadingMsg.style.display = 'block';
-    errorMsg.innerHTML = '';
-    warningMsg.innerHTML = '';
-    container.innerHTML = '';
+// Show error message
+function showError(message) {
+    const errorMsg = document.getElementById('errorMessage');
+    errorMsg.innerHTML = `
+        <div class="error">
+            ⚠️ ${message}
+        </div>
+    `;
+}
+
+// Fetch data via REST API (fallback method)
+async function fetchViaAPI() {
+    console.log('[API] Fetching via REST API...');
+    updateLoadingMessage('📡 Fetching via REST API...', 'Using HTTP fallback');
     
-    updateConnectionStatus('Connecting...', 'loading');
-    updateLoadingMessage('🔄 Connecting to Delta Exchange...', 'Initializing...');
-
-    // Try each proxy
+    const proxies = [
+        { name: 'AllOrigins', url: (api) => `https://api.allorigins.win/raw?url=${encodeURIComponent(api)}` },
+        { name: 'CORSProxy', url: (api) => `https://corsproxy.io/?${encodeURIComponent(api)}` }
+    ];
+    
     for (let i = 0; i < proxies.length; i++) {
-        currentProxyIndex = (currentProxyIndex + i) % proxies.length;
-        const proxy = proxies[currentProxyIndex];
-        
+        const proxy = proxies[i];
         try {
-            console.log(`[${new Date().toLocaleTimeString()}] Trying ${proxy.name}...`);
-            
-            updateLoadingMessage(
-                `🔄 Trying ${proxy.name}...`,
-                `Attempt ${i + 1} of ${proxies.length}`
-            );
-            updateConnectionStatus(`Trying ${proxy.name}...`, 'loading');
+            console.log(`[API] Trying ${proxy.name}...`);
+            updateLoadingMessage(`🔄 Trying ${proxy.name}...`, `Attempt ${i + 1}/${proxies.length}`);
             
             const apiUrl = 'https://api.delta.exchange/v2/tickers';
             const proxyUrl = proxy.url(apiUrl);
@@ -70,98 +78,166 @@ async function fetchData() {
             const response = await fetch(proxyUrl, {
                 method: 'GET',
                 headers: { 'Accept': 'application/json' },
-                signal: AbortSignal.timeout(10000) // 10 second timeout
+                signal: AbortSignal.timeout(15000)
             });
             
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
-
+            
             const data = await response.json();
             
             if (!data.result || !Array.isArray(data.result)) {
                 throw new Error('Invalid data format');
             }
-
-            // SUCCESS!
-            console.log(`[${new Date().toLocaleTimeString()}] ✅ Success with ${proxy.name}`);
             
-            updateLoadingMessage('✅ Connected! Processing data...', `Using ${proxy.name}`);
-            updateConnectionStatus('Connected ✓', 'success');
+            console.log(`[API] ✅ Success with ${proxy.name}`);
+            allCryptoData = data.result;
+            processAndDisplayData();
             
-            // Filter cryptos
-            const filteredCryptos = data.result.filter(crypto => {
-                const fundingRate = parseFloat(crypto.funding_rate) * 100;
-                return Math.abs(fundingRate) >= 0.50;
-            });
-
-            console.log(`Found ${filteredCryptos.length} cryptos above threshold`);
+            updateConnectionStatus(`Connected via ${proxy.name}`, 'success');
+            showSuccessBanner(`<strong>Connected!</strong><br><small>Using: ${proxy.name} REST API</small>`);
             
-            // Display results
-            displayCryptos(filteredCryptos);
-            updateStats(filteredCryptos);
-            updateLastUpdateTime();
-            resetCountdown();
-            retryCount = 0;
+            document.getElementById('loadingMessage').style.display = 'none';
+            return true;
             
-            // Success message
-            warningMsg.innerHTML = `
-                <div class="warning success-banner">
-                    ✅ <strong>Successfully Connected!</strong><br>
-                    <small>Using: ${proxy.name} | Found: ${filteredCryptos.length} cryptos | Time: ${new Date().toLocaleTimeString()}</small>
-                </div>
-            `;
-            setTimeout(() => {
-                warningMsg.innerHTML = '';
-            }, 8000);
-            
-            loadingMsg.style.display = 'none';
-            btn.disabled = false;
-            btn.textContent = '🔄 Refresh Now';
-            
-            return; // Exit on success
-
         } catch (error) {
-            console.error(`[${new Date().toLocaleTimeString()}] ❌ ${proxy.name} failed:`, error.message);
-            
-            updateLoadingMessage(
-                `⚠️ ${proxy.name} failed`,
-                `Error: ${error.message} - Trying next...`
-            );
-            
-            // Wait before trying next
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            // If last proxy failed
-            if (i === proxies.length - 1) {
-                updateConnectionStatus('Connection Failed ✗', 'error');
-                
-                errorMsg.innerHTML = `
-                    <div class="error">
-                        ⚠️ <strong>All Connection Attempts Failed</strong><br>
-                        <small>Tried ${proxies.length} different proxies</small><br>
-                        <small style="opacity: 0.7;">Last Error: ${error.message}</small><br>
-                        <br>
-                        <strong>Auto-retry in 10 seconds...</strong>
-                    </div>
-                `;
-                
-                // Auto retry
-                if (retryCount < maxRetries) {
-                    retryCount++;
-                    console.log(`[${new Date().toLocaleTimeString()}] 🔄 Auto retry ${retryCount}/${maxRetries}`);
-                    setTimeout(() => fetchData(), 10000);
-                } else {
-                    console.log(`[${new Date().toLocaleTimeString()}] ❌ Max retries reached`);
-                    errorMsg.innerHTML += `<br><small>Max retries reached. Please refresh manually.</small>`;
-                }
-            }
+            console.error(`[API] ${proxy.name} failed:`, error.message);
         }
     }
+    
+    // All methods failed
+    console.error('[API] All methods failed');
+    updateConnectionStatus('Connection Failed', 'error');
+    showError('<strong>Connection Failed</strong><br><small>Kuch der baad refresh karein</small>');
+    document.getElementById('loadingMessage').style.display = 'none';
+    return false;
+}
 
-    loadingMsg.style.display = 'none';
-    btn.disabled = false;
-    btn.textContent = '🔄 Refresh Now';
+// Connect via WebSocket (Primary method)
+function connectWebSocket() {
+    console.log('[WebSocket] Attempting connection...');
+    updateLoadingMessage('🔌 Connecting WebSocket...', 'Real-time connection');
+    updateConnectionStatus('Connecting WebSocket...', 'loading');
+    
+    try {
+        // Delta Exchange WebSocket endpoint
+        ws = new WebSocket('wss://socket.delta.exchange');
+        
+        ws.onopen = function() {
+            console.log('[WebSocket] ✅ Connected!');
+            isConnected = true;
+            reconnectAttempts = 0;
+            
+            updateConnectionStatus('WebSocket Connected', 'success');
+            updateLoadingMessage('✅ WebSocket Connected!', 'Subscribing to ticker updates...');
+            
+            // Subscribe to all tickers
+            const subscribeMessage = {
+                "type": "subscribe",
+                "payload": {
+                    "channels": [
+                        {
+                            "name": "v2/ticker",
+                            "symbols": ["MARK:BTCUSD", "MARK:ETHUSD"] // Add more symbols
+                        }
+                    ]
+                }
+            };
+            
+            ws.send(JSON.stringify(subscribeMessage));
+            console.log('[WebSocket] Subscription sent');
+            
+            // Also fetch initial data via API
+            fetchViaAPI();
+        };
+        
+        ws.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('[WebSocket] Data received:', data.type);
+                
+                if (data.type === 'ticker') {
+                    // Update specific ticker data
+                    updateTickerData(data);
+                }
+            } catch (error) {
+                console.error('[WebSocket] Parse error:', error);
+            }
+        };
+        
+        ws.onerror = function(error) {
+            console.error('[WebSocket] Error:', error);
+            updateConnectionStatus('WebSocket Error', 'error');
+            
+            // Fallback to REST API
+            if (!isConnected) {
+                console.log('[WebSocket] Failed, falling back to REST API');
+                updateLoadingMessage('⚠️ WebSocket failed', 'Switching to REST API...');
+                setTimeout(() => fetchViaAPI(), 2000);
+            }
+        };
+        
+        ws.onclose = function() {
+            console.log('[WebSocket] Connection closed');
+            isConnected = false;
+            updateConnectionStatus('WebSocket Disconnected', 'error');
+            
+            // Try to reconnect
+            if (reconnectAttempts < maxReconnectAttempts) {
+                reconnectAttempts++;
+                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                console.log(`[WebSocket] Reconnecting in ${delay/1000}s... (${reconnectAttempts}/${maxReconnectAttempts})`);
+                
+                setTimeout(() => {
+                    console.log('[WebSocket] Reconnecting...');
+                    connectWebSocket();
+                }, delay);
+            } else {
+                console.log('[WebSocket] Max reconnect attempts reached, using REST API');
+                fetchViaAPI();
+            }
+        };
+        
+    } catch (error) {
+        console.error('[WebSocket] Connection error:', error);
+        updateConnectionStatus('WebSocket Failed', 'error');
+        
+        // Fallback to REST API immediately
+        console.log('[WebSocket] Using REST API fallback');
+        fetchViaAPI();
+    }
+}
+
+// Update ticker data from WebSocket
+function updateTickerData(tickerData) {
+    // Update the crypto data array
+    const index = allCryptoData.findIndex(c => c.symbol === tickerData.symbol);
+    if (index !== -1) {
+        allCryptoData[index] = { ...allCryptoData[index], ...tickerData };
+    } else {
+        allCryptoData.push(tickerData);
+    }
+    
+    // Refresh display
+    processAndDisplayData();
+}
+
+// Process and display filtered data
+function processAndDisplayData() {
+    console.log('[Data] Processing crypto data...');
+    
+    // Filter: funding rate >= 0.50% or <= -0.50%
+    const filteredCryptos = allCryptoData.filter(crypto => {
+        const fundingRate = parseFloat(crypto.funding_rate || 0) * 100;
+        return Math.abs(fundingRate) >= 0.50;
+    });
+    
+    console.log(`[Data] Found ${filteredCryptos.length} cryptos above threshold`);
+    
+    displayCryptos(filteredCryptos);
+    updateStats(filteredCryptos);
+    updateLastUpdateTime();
 }
 
 // Display cryptos
@@ -177,16 +253,16 @@ function displayCryptos(cryptos) {
         `;
         return;
     }
-
-    // Sort by funding rate
+    
+    // Sort by absolute funding rate
     cryptos.sort((a, b) => {
-        const rateA = parseFloat(a.funding_rate) * 100;
-        const rateB = parseFloat(b.funding_rate) * 100;
-        return Math.abs(rateB) - Math.abs(rateA);
+        const rateA = Math.abs(parseFloat(a.funding_rate || 0) * 100);
+        const rateB = Math.abs(parseFloat(b.funding_rate || 0) * 100);
+        return rateB - rateA;
     });
-
+    
     container.innerHTML = cryptos.map((crypto, index) => {
-        const fundingRate = parseFloat(crypto.funding_rate) * 100;
+        const fundingRate = parseFloat(crypto.funding_rate || 0) * 100;
         const isPositive = fundingRate > 0;
         const sign = isPositive ? '+' : '';
         
@@ -201,17 +277,17 @@ function displayCryptos(cryptos) {
                 <div class="crypto-info">
                     <strong>Mark Price:</strong> $${parseFloat(crypto.mark_price || 0).toFixed(2)}<br>
                     <strong>24h Volume:</strong> $${parseFloat(crypto.turnover_24h || 0).toLocaleString()}<br>
-                    <strong>Contract:</strong> ${crypto.contract_type || 'N/A'}
+                    <strong>Contract:</strong> ${crypto.contract_type || 'Perpetual'}
                 </div>
             </div>
         `;
     }).join('');
 }
 
-// Update stats
+// Update statistics
 function updateStats(cryptos) {
-    const positive = cryptos.filter(c => parseFloat(c.funding_rate) > 0.005).length;
-    const negative = cryptos.filter(c => parseFloat(c.funding_rate) < -0.005).length;
+    const positive = cryptos.filter(c => parseFloat(c.funding_rate || 0) > 0.005).length;
+    const negative = cryptos.filter(c => parseFloat(c.funding_rate || 0) < -0.005).length;
     
     document.getElementById('totalCount').textContent = cryptos.length;
     document.getElementById('positiveCount').textContent = positive;
@@ -224,26 +300,27 @@ function updateLastUpdateTime() {
     document.getElementById('lastUpdate').textContent = now.toLocaleTimeString('hi-IN');
 }
 
-// Countdown functions
-function resetCountdown() {
-    secondsRemaining = 60;
-    updateCountdown();
+// Manual refresh
+function manualRefresh() {
+    console.log('[Manual] Refresh triggered');
+    const btn = document.getElementById('refreshBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Loading...';
+    
+    fetchViaAPI().then(() => {
+        btn.disabled = false;
+        btn.textContent = '🔄 Refresh Now';
+    });
 }
 
-function updateCountdown() {
-    document.getElementById('nextUpdate').textContent = `${secondsRemaining}s`;
-    if (secondsRemaining > 0) {
-        secondsRemaining--;
-    }
-}
-
-// Auto-refresh setup
+// Auto-refresh every 60 seconds
 function startAutoRefresh() {
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    if (countdownInterval) clearInterval(countdownInterval);
-
-    autoRefreshInterval = setInterval(fetchData, 60000);
-    countdownInterval = setInterval(updateCountdown, 1000);
+    
+    autoRefreshInterval = setInterval(() => {
+        console.log('[Auto-refresh] Fetching new data...');
+        fetchViaAPI();
+    }, 60000); // 60 seconds
     
     console.log('[Auto-refresh] Started - Every 60 seconds');
 }
@@ -251,197 +328,34 @@ function startAutoRefresh() {
 // Initialize on page load
 window.addEventListener('load', () => {
     console.log('[Init] Starting Delta Exchange Monitor...');
-    fetchData();
+    console.log('[Init] Time:', new Date().toLocaleTimeString());
+    
+    // Try WebSocket first, fallback to REST API
+    connectWebSocket();
+    
+    // Start auto-refresh
     startAutoRefresh();
 });
 
 // Cleanup
 window.addEventListener('beforeunload', () => {
+    if (ws) ws.close();
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    if (countdownInterval) clearInterval(countdownInterval);
 });
 
 // Network status
 window.addEventListener('online', () => {
     console.log('[Network] Connection restored');
-    document.getElementById('warningMessage').innerHTML = `
-        <div class="warning success-banner">
-            ✅ Internet connection restored! Refreshing data...
-        </div>
-    `;
-    setTimeout(() => fetchData(), 1000);
+    showSuccessBanner('Internet connection restored! Reconnecting...');
+    setTimeout(() => {
+        if (!isConnected) {
+            connectWebSocket();
+        }
+    }, 1000);
 });
 
 window.addEventListener('offline', () => {
     console.log('[Network] Connection lost');
-    updateConnectionStatus('Offline ✗', 'error');
-    document.getElementById('errorMessage').innerHTML = `
-        <div class="error">
-            📡 No internet connection detected<br>
-            <small>Waiting to reconnect...</small>
-        </div>
-    `;
-});            setTimeout(() => warningMsg.innerHTML = '', 5000);
-            
-            loadingMsg.style.display = 'none';
-            btn.disabled = false;
-            btn.textContent = '🔄 Refresh Now';
-            return; // Success - exit function
-
-        } catch (error) {
-            console.error(`${proxy.name} failed:`, error.message);
-            
-            // Show which proxy failed
-            loadingMsg.innerHTML = `
-                <div class="spinner"></div>
-                <p>⚠️ ${proxy.name} failed, trying next...</p>
-                <small style="opacity: 0.7;">${error.message}</small>
-            `;
-            
-            // Wait a bit before trying next proxy
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // If this was the last proxy, show error
-            if (i === proxies.length - 1) {
-                statusIndicator.className = 'status-indicator error';
-                errorMsg.innerHTML = `
-                    <div class="error">
-                        ⚠️ <strong>Connection Error</strong><br>
-                        <small>Sabhi proxy services fail ho gayi. Kuch der baad try karein.</small><br>
-                        <small style="opacity: 0.7;">Error: ${error.message}</small>
-                    </div>
-                `;
-                
-                // Auto retry after 10 seconds
-                if (retryCount < maxRetries) {
-                    retryCount++;
-                    setTimeout(() => {
-                        console.log(`Auto retry ${retryCount}/${maxRetries}...`);
-                        fetchData();
-                    }, 10000);
-                }
-            }
-        }
-    }
-
-    loadingMsg.style.display = 'none';
-    btn.disabled = false;
-    btn.textContent = '🔄 Refresh Now';
-}
-
-// Cryptos display karne ka function
-function displayCryptos(cryptos) {
-    const container = document.getElementById('cryptoContainer');
-    
-    if (cryptos.length === 0) {
-        container.innerHTML = `
-            <div class="no-data">
-                📭 Abhi koi crypto 0.50% threshold cross nahi kar raha
-            </div>
-        `;
-        return;
-    }
-
-    // Funding rate ke according sort karein (highest to lowest)
-    cryptos.sort((a, b) => {
-        const rateA = parseFloat(a.funding_rate) * 100;
-        const rateB = parseFloat(b.funding_rate) * 100;
-        return Math.abs(rateB) - Math.abs(rateA);
-    });
-
-    container.innerHTML = cryptos.map(crypto => {
-        const fundingRate = parseFloat(crypto.funding_rate) * 100;
-        const isPositive = fundingRate > 0;
-        const sign = isPositive ? '+' : '';
-        
-        return `
-            <div class="crypto-card ${isPositive ? 'positive' : 'negative'}">
-                <div class="crypto-header">
-                    <div class="crypto-symbol">${crypto.symbol || 'N/A'}</div>
-                    <div class="funding-rate ${isPositive ? 'positive' : 'negative'}">
-                        ${sign}${fundingRate.toFixed(4)}%
-                    </div>
-                </div>
-                <div class="crypto-info">
-                    <strong>Mark Price:</strong> $${parseFloat(crypto.mark_price || 0).toFixed(2)}<br>
-                    <strong>24h Volume:</strong> $${parseFloat(crypto.turnover_24h || 0).toLocaleString()}<br>
-                    <strong>Contract Type:</strong> ${crypto.contract_type || 'N/A'}
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-// Stats update karne ka function
-function updateStats(cryptos) {
-    const positive = cryptos.filter(c => parseFloat(c.funding_rate) > 0.005).length;
-    const negative = cryptos.filter(c => parseFloat(c.funding_rate) < -0.005).length;
-    
-    document.getElementById('totalCount').textContent = cryptos.length;
-    document.getElementById('positiveCount').textContent = positive;
-    document.getElementById('negativeCount').textContent = negative;
-}
-
-// Last update time
-function updateLastUpdateTime() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('hi-IN');
-    document.getElementById('lastUpdate').textContent = timeString;
-}
-
-// Countdown reset
-function resetCountdown() {
-    secondsRemaining = 60;
-    updateCountdown();
-}
-
-// Countdown update
-function updateCountdown() {
-    document.getElementById('nextUpdate').textContent = `${secondsRemaining}s`;
-    if (secondsRemaining > 0) {
-        secondsRemaining--;
-    }
-}
-
-// Auto-refresh setup (har 1 minute)
-function startAutoRefresh() {
-    // Pehle existing intervals clear karein
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    if (countdownInterval) clearInterval(countdownInterval);
-
-    // 60 seconds (1 minute) mein refresh
-    autoRefreshInterval = setInterval(fetchData, 60000);
-    
-    // Countdown har second
-    countdownInterval = setInterval(updateCountdown, 1000);
-}
-
-// Page load hone pe
-window.addEventListener('load', () => {
-    fetchData();
-    startAutoRefresh();
-});
-
-// Page close hone pe intervals clear karein
-window.addEventListener('beforeunload', () => {
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    if (countdownInterval) clearInterval(countdownInterval);
-});
-
-// Online/Offline detection
-window.addEventListener('online', () => {
-    document.getElementById('warningMessage').innerHTML = `
-        <div class="warning">
-            ✅ Internet connection restored! Refreshing...
-        </div>
-    `;
-    setTimeout(() => fetchData(), 1000);
-});
-
-window.addEventListener('offline', () => {
-    document.getElementById('errorMessage').innerHTML = `
-        <div class="error">
-            📡 No internet connection. Waiting to reconnect...
-        </div>
-    `;
+    updateConnectionStatus('Offline', 'error');
+    showError('📡 No internet connection<br><small>Waiting to reconnect...</small>');
 });
