@@ -1,25 +1,28 @@
 /**
- * Delta Exchange Monitor - FINAL PUBLIC REST API VERSION
- * NO API KEY REQUIRED. Uses the stable /v2/products endpoint.
+ * Delta Exchange Funding Monitor - FINAL PRODUCTION READY VERSION
+ * Designed to work with a Serverless Proxy (e.g., Netlify/Vercel) to bypass CORS.
  */
 
-// 1. कॉन्फ़िगरेशन
-// अब API Key की कोई जरूरत नहीं है
-const API_URL = "https://corsproxy.io/?https://api.delta.exchange/v2/products"; 
-const FUNDING_THRESHOLD = 0.0001; // TESTING THRESHOLD (0.01%) - बाद में 0.0050 कर दें
-const REFRESH_TIME = 5 * 60; // 5 minutes
+// =======================================================
+// ⚠️ IMPORTANT: इस URL को अपने Serverless Function URL से बदलें
+// For testing on GitHub Pages, use: 
+// const API_URL = "https://api.delta.exchange/v2/products"; 
+// =======================================================
+const API_URL = "https://api.delta.exchange/v2/products"; 
+// =======================================================
 
-// Elements (पुराने HTML structure के अनुसार)
-const fundingGrid = document.getElementById('crypto-grid') || document.getElementById('funding-grid'); 
+const FUNDING_THRESHOLD = 0.0050; // 0.50% (Testing ke baad ise 0.0050 rakhein)
+const REFRESH_TIME = 5 * 60; // 5 minutes (in seconds)
+
+// DOM Elements
+const fundingGrid = document.getElementById('crypto-list') || document.getElementById('funding-grid'); 
 const statusBadge = document.getElementById('connection-status');
 const countdownEl = document.getElementById('countdown');
-const debugLog = document.getElementById('debug-log'); // Debug area (if present)
 
 let countdownTimer = REFRESH_TIME;
-let marketRates = {};
 
-// Helper function for status/logging
-function updateStatus(state, message = '') {
+// --- 1. Status Update Utility ---
+function updateStatus(state) {
     const badge = statusBadge || document.createElement('div');
     if (state === 'connected') {
         badge.innerHTML = `<span class="dot"></span> Live`;
@@ -33,17 +36,17 @@ function updateStatus(state, message = '') {
         badge.innerHTML = `<span class="dot"></span> Updating...`;
         badge.classList.remove('status-connected', 'status-error');
     }
-    if (debugLog) debugLog.innerHTML += `<p>${new Date().toLocaleTimeString()} - ${state}: ${message}</p>`;
 }
 
 // --- 2. Main Fetch Function ---
 async function fetchMarketData() {
-    updateStatus('updating', 'Starting fetch...');
+    updateStatus('updating');
 
+    // Show loading spinner while fetching
     fundingGrid.innerHTML = `
         <div class="loading-container">
             <div class="spinner"></div>
-            <p>Scanning Public Market Data...</p>
+            <p>Scanning Delta Market...</p>
         </div>
     `;
     
@@ -55,74 +58,64 @@ async function fetchMarketData() {
         const data = await response.json();
         
         if (data && Array.isArray(data)) {
-            marketRates = {};
-            
-            data.forEach(product => {
-                // Check for Perpetual Futures and Funding Rate field
-                if (product.perpetual === true && product.symbol && product.funding_rate !== undefined) {
-                    const rate = parseFloat(product.funding_rate);
-                    if (!isNaN(rate)) {
-                        marketRates[product.symbol] = rate;
-                    }
-                }
-            });
-
-            renderCards(marketRates);
-            updateStatus('connected', `Processed ${Object.keys(marketRates).length} symbols.`);
+            renderCards(data);
+            updateStatus('connected');
             resetTimer();
-
         } else {
             throw new Error("Invalid or empty data format received.");
         }
 
     } catch (error) {
-        updateStatus('error', `Fetch Error: ${error.message}`);
+        updateStatus('error');
         fundingGrid.innerHTML = `
             <div class="loading-container">
                 <p style="color: #ef4444; font-size: 1.5rem;">❌</p>
                 <p style="color: #ef4444;">API Connection Failed.</p>
-                <p style="font-size: 0.8rem;">Check network or endpoint URL.</p>
+                <p style="font-size: 0.8rem;">(Need a Serverless Proxy)</p>
             </div>`;
     }
 }
 
 // --- 3. Render Cards Function ---
-function renderCards(rates) {
+function renderCards(products) {
     fundingGrid.innerHTML = ''; 
     let hasOpportunities = false;
     
-    const currentThreshold = FUNDING_THRESHOLD; 
-
-    for (const symbol in rates) {
-        const rate = rates[symbol];
-        const absRate = Math.abs(rate);
-
-        if (absRate >= currentThreshold) {
-            hasOpportunities = true;
-            const isPositive = rate > 0;
-            const ratePercent = (rate * 100).toFixed(4) + '%';
+    products.forEach(p => {
+        // Check for Perpetual Futures and Funding Rate field
+        if (p.perpetual === true && p.symbol && p.funding_rate !== undefined) {
             
-            const div = document.createElement('div');
-            div.className = `card ${isPositive ? 'long' : 'short'}`;
-            div.innerHTML = `
-                <div class="symbol-info">
-                    <h2>${symbol}</h2>
-                    <p>${isPositive ? 'PAY SHORT' : 'PAY LONG'}</p>
-                </div>
-                <div class="rate-info">
-                    <span class="rate-val" style="color: ${isPositive ? '#10b981' : '#ef4444'}">${ratePercent}</span>
-                    <span class="sub-val">Funding</span>
-                </div>
-            `;
-            fundingGrid.appendChild(div);
+            const rate = parseFloat(p.funding_rate);
+            const absRate = Math.abs(rate);
+
+            if (absRate >= FUNDING_THRESHOLD) {
+                hasOpportunities = true;
+                const isPositive = rate > 0;
+                const ratePercent = (rate * 100).toFixed(4) + '%';
+                
+                const div = document.createElement('div');
+                div.className = `crypto-card ${isPositive ? 'long' : 'short'}`;
+                
+                div.innerHTML = `
+                    <div class="symbol-info">
+                        <h2>${p.symbol}</h2>
+                        <p>${isPositive ? 'LONG (Pay Short)' : 'SHORT (Pay Long)'}</p>
+                    </div>
+                    <div class="rate-info">
+                        <span class="rate-val" style="color: ${isPositive ? '#10b981' : '#ef4444'}">${ratePercent}</span>
+                        <span class="sub-val">Funding Rate</span>
+                    </div>
+                `;
+                fundingGrid.appendChild(div);
+            }
         }
-    }
+    });
 
     if (!hasOpportunities) {
         fundingGrid.innerHTML = `
             <div class="loading-container">
                 <p style="font-size: 2rem;">😴</p>
-                <p>Threshold: ${(currentThreshold * 100).toFixed(2)}%</p>
+                <p>Threshold: ${(FUNDING_THRESHOLD * 100).toFixed(2)}%</p>
                 <p style="font-size: 0.8rem;">No crypto found.</p>
             </div>`;
     }
@@ -142,5 +135,5 @@ setInterval(() => {
     }
 }, 1000);
 
-// Start
+// Start on load
 document.addEventListener('DOMContentLoaded', fetchMarketData);
