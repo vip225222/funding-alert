@@ -29,6 +29,13 @@ async function fetchData() {
     warningMsg.innerHTML = '';
     container.innerHTML = '';
     statusIndicator.className = 'status-indicator';
+    
+    // Show trying message
+    loadingMsg.innerHTML = `
+        <div class="spinner"></div>
+        <p>Delta Exchange se data fetch ho raha hai...</p>
+        <small style="opacity: 0.7;">Proxy: Connecting...</small>
+    `;
 
     // Try each proxy
     for (let i = 0; i < proxies.length; i++) {
@@ -37,6 +44,13 @@ async function fetchData() {
         
         try {
             console.log(`Trying ${proxy.name} proxy...`);
+            
+            // Update loading message with current proxy
+            loadingMsg.innerHTML = `
+                <div class="spinner"></div>
+                <p>🔄 Connecting to Delta Exchange...</p>
+                <small style="opacity: 0.8;">Using: ${proxy.name} (${i + 1}/${proxies.length})</small>
+            `;
             
             const apiUrl = 'https://api.delta.exchange/v2/tickers';
             const proxyUrl = proxy.url(apiUrl);
@@ -61,6 +75,13 @@ async function fetchData() {
             // Success!
             console.log(`Success with ${proxy.name}`);
             
+            // Show success notification
+            loadingMsg.innerHTML = `
+                <div class="spinner"></div>
+                <p>✅ Connected! Data load ho raha hai...</p>
+                <small style="opacity: 0.8;">Proxy: ${proxy.name}</small>
+            `;
+            
             // Filter: funding rate 0.50% se upar ya niche
             const filteredCryptos = data.result.filter(crypto => {
                 const fundingRate = parseFloat(crypto.funding_rate) * 100;
@@ -75,15 +96,14 @@ async function fetchData() {
             
             statusIndicator.className = 'status-indicator success';
             
-            // Show success message for first load
-            if (i > 0) {
-                warningMsg.innerHTML = `
-                    <div class="warning">
-                        ✅ Connected successfully using ${proxy.name} proxy
-                    </div>
-                `;
-                setTimeout(() => warningMsg.innerHTML = '', 5000);
-            }
+            // Show final success message
+            warningMsg.innerHTML = `
+                <div class="warning" style="background: #d1fae5; color: #065f46;">
+                    ✅ <strong>Successfully Connected!</strong><br>
+                    <small>Proxy: ${proxy.name} | Found ${filteredCryptos.length} cryptos above threshold</small>
+                </div>
+            `;
+            setTimeout(() => warningMsg.innerHTML = '', 5000);
             
             loadingMsg.style.display = 'none';
             btn.disabled = false;
@@ -92,6 +112,16 @@ async function fetchData() {
 
         } catch (error) {
             console.error(`${proxy.name} failed:`, error.message);
+            
+            // Show which proxy failed
+            loadingMsg.innerHTML = `
+                <div class="spinner"></div>
+                <p>⚠️ ${proxy.name} failed, trying next...</p>
+                <small style="opacity: 0.7;">${error.message}</small>
+            `;
+            
+            // Wait a bit before trying next proxy
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
             // If this was the last proxy, show error
             if (i === proxies.length - 1) {
