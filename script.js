@@ -1,108 +1,128 @@
 /**
- * Delta Exchange Funding Rate Monitor - Mobile Debugging Version
- * यह संस्करण स्क्रीन पर ही आने वाले डेटा को प्रिंट करता है।
+ * Delta Exchange Funding Rate Monitor - Public REST API Polling Version
+ * API Key या WebSocket की आवश्यकता नहीं है। Public Data Polling का उपयोग करता है।
  */
 
 // 1. कॉन्फ़िगरेशन
-const DELTA_WS_URL = "wss://socket.delta.exchange"; 
-const FUNDING_THRESHOLD = 0.0050; 
-const TEST_THRESHOLD = 0.0001; // टेस्टिंग के लिए कम थ्रेशोल्ड
-const REFRESH_INTERVAL_MS = 5 * 60 * 1000; 
+const REST_API_URL = "https://api.delta.exchange/v2/products"; 
+const FUNDING_THRESHOLD = 0.0050; // 0.50%
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 मिनट
 
 // 2. DOM एलिमेंट्स
-const statusDisplay = document.getElementById('ws-status');
+const statusDisplay = document.getElementById('ws-status'); // नाम ws-status ही रहने दें
 const listContainer = document.getElementById('crypto-list');
-const debugArea = document.getElementById('debug-area'); // नया डीबग एलिमेंट
+const debugArea = document.getElementById('debug-area');
 
 // 3. डेटा स्टोर
 let marketRates = {}; 
 
-// सुरक्षित रूप से फंडिंग रेट फ़ील्ड खोजने के लिए फ़ंक्शन
-function getFundingRateValue(ticker) {
-    if (ticker.funding_rate !== undefined) return ticker.funding_rate;
-    if (ticker.rate !== undefined) return ticker.rate;
-    if (ticker.fr !== undefined) return ticker.fr;
-    return undefined;
-}
-
-// स्क्रीन पर डीबग लॉग प्रिंट करें
 function logToDebugArea(message) {
+    // मोबाइल डीबगिंग के लिए
     const p = document.createElement('p');
     p.style.margin = '2px 0';
     p.style.fontSize = '0.7em';
     p.textContent = message;
     
-    // सुनिश्चित करें कि यह बहुत बड़ा न हो जाए
     if (debugArea.children.length > 20) {
-        debugArea.removeChild(debugArea.children[1]); // पुराने लॉग्स को हटाएँ
+        debugArea.removeChild(debugArea.children[1]); 
     }
     debugArea.appendChild(p);
-    debugArea.scrollTop = debugArea.scrollHeight; // नीचे स्क्रॉल करें
+    debugArea.scrollTop = debugArea.scrollHeight; 
 }
 
-// 4. WebSocket कनेक्शन स्थापित करना
-function initWebSocket() {
-    statusDisplay.textContent = "कनेक्टिंग...";
+// 4. REST API से डेटा Fetch करने का मुख्य फंक्शन
+async function fetchFundingRates() {
+    logToDebugArea(`🔄 Fetching data from REST API at ${new Date().toLocaleTimeString()}...`);
+    statusDisplay.textContent = "डेटा फ़ेच हो रहा...";
     statusDisplay.setAttribute('data-status', 'connecting');
-    debugArea.innerHTML = '<h3>Live Data Stream (Debugging)</h3>';
 
-    const ws = new WebSocket(DELTA_WS_URL);
-
-    ws.onopen = () => {
-        logToDebugArea("✅ Connected. Subscribing...");
-        statusDisplay.textContent = "कनेक्टेड (OK)";
-        statusDisplay.setAttribute('data-status', 'connected');
-
-        ws.send(JSON.stringify({
-            "op": "subscribe",
-            "channel": "ticker",
-            "symbols": ["*"] 
-        }));
-    };
-
-    ws.onmessage = (event) => {
-        try {
-            const data = JSON.parse(event.data);
+    try {
+        const response = await fetch(REST_API_URL);
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // **डेटा प्रोसेसिंग:** हम मान रहे हैं कि डेटा एक एरे में है
+        if (data && Array.isArray(data)) {
+            marketRates = {}; // डेटा स्टोर को रीसेट करें
+            let processedCount = 0;
             
-            if (data.channel === 'ticker' && data.data) {
-                const ticker = data.data;
-
-                // *** 🛑 मोबाइल डीबगिंग स्टेप: स्क्रीन पर डेटा प्रिंट करें 🛑 ***
-                const keys = Object.keys(ticker);
-                logToDebugArea(`Keys: ${keys.join(', ')}`);
-                // -----------------------------------------------------------
-
-                const symbol = ticker.symbol;
-                let fundingRateValue = getFundingRateValue(ticker);
-                
-                if (symbol && fundingRateValue !== undefined) {
-                    logToDebugArea(`Found: ${symbol}, Rate: ${fundingRateValue}`);
+            data.forEach(product => {
+                // केवल Perpetual Futures (PERP) को देखें
+                if (product.perpetual === true && product.symbol && product.funding_rate !== undefined) {
+                    const symbol = product.symbol;
+                    const fundingRate = parseFloat(product.funding_rate);
                     
-                    const fundingRate = parseFloat(fundingRateValue); 
-
                     if (!isNaN(fundingRate)) {
                         marketRates[symbol] = fundingRate;
+                        processedCount++;
                     }
                 }
-            }
+            });
+
+            logToDebugArea(`✅ Data fetched successfully. Processed ${processedCount} symbols.`);
+            statusDisplay.textContent = `अंतिम अपडेट: ${new Date().toLocaleTimeString()}`;
+            statusDisplay.setAttribute('data-status', 'connected');
             
-        } catch (error) {
-            // silent fail
+            // डेटा फ़ेच होने के तुरंत बाद डिस्प्ले अपडेट करें
+            refreshDisplay(); 
+
+        } else {
+            throw new Error("Invalid data format received.");
         }
-    };
 
-    ws.onclose = () => {
-        logToDebugArea("❌ Disconnected. Retrying in 5s.");
-        statusDisplay.textContent = "डिस्कनेक्टेड (Reconnecting)";
+    } catch (error) {
+        logToDebugArea(`❌ Fetch Error: ${error.message}`);
+        statusDisplay.textContent = "कनेक्शन एरर";
         statusDisplay.setAttribute('data-status', 'error');
-        setTimeout(initWebSocket, 5000);
-    };
+    }
+}
 
-    ws.onerror = (error) => {
-        logToDebugArea("🚨 WebSocket Error!");
-        statusDisplay.textContent = "एरर";
-        statusDisplay.setAttribute('data-status', 'error');
-        ws.close();
+
+// 5. डिस्प्ले को अपडेट करने का फंक्शन
+function refreshDisplay() {
+    listContainer.innerHTML = ''; 
+    let alertFound = false;
+
+    for (const symbol in marketRates) {
+        const rate = marketRates[symbol];
+        const absRate = Math.abs(rate);
+        
+        // शर्त चेक करें: 0.50% की वास्तविक थ्रेशोल्ड
+        if (absRate >= FUNDING_THRESHOLD) {
+            alertFound = true;
+            
+            const card = document.createElement('div');
+            const ratePercent = (rate * 100).toFixed(4) + '%'; 
+            
+            const rateClass = rate > 0 ? 'positive' : 'negative';
+            const cardClass = rate > 0 ? 'long' : 'short';
+            
+            card.className = `crypto-card ${cardClass}`;
+            card.innerHTML = `
+                <div class="symbol">${symbol}</div>
+                <div class="rate">Funding Rate: <span class="${rateClass}">${ratePercent}</span></div>
+                <p>साइड: ${rate > 0 ? 'LONG (Pay Short)' : 'SHORT (Pay Long)'}</p>
+            `;
+            listContainer.appendChild(card);
+        }
+    }
+
+    if (!alertFound) {
+        listContainer.innerHTML = `<p>वर्तमान में कोई Crypto **${(FUNDING_THRESHOLD * 100).toFixed(2)}%** की अलर्ट सीमा को पार नहीं कर रहा है।</p>`;
+    }
+}
+
+// 6. मुख्य प्रक्रिया शुरू करना
+document.addEventListener('DOMContentLoaded', () => {
+    // तुरंत पहली बार डेटा फ़ेच करें
+    fetchFundingRates();
+    
+    // हर 5 मिनट में डेटा फ़ेच करें (Polling)
+    setInterval(fetchFundingRates, REFRESH_INTERVAL_MS);
+});
     };
 }
 
