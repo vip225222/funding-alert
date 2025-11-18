@@ -1,35 +1,17 @@
 * { margin:0; padding:0; box-sizing:border-box; }
-body {
-    font-family: Arial, sans-serif;
-    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-    color: white;
-    min-height: 100vh;
-}
-.container { max-width: 900px; margin: 20px auto; padding: 20px; }
-h1 {
-    text-align: center; font-size: 2.8rem; margin-bottom: 10px;
-    background: linear-gradient(to right, #00ff88, #00ffff);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-}
-.subtitle { text-align: center; color: #00ffff; margin-bottom: 25px; font-size: 1.1rem; }
+body { font-family: Arial; background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); color: white; min-height: 100vh; }
+.container { max-width: 1000px; margin: 20px auto; padding: 20px; }
+h1 { text-align: center; font-size: 2.8rem; background: linear-gradient(to right, #ff006e, #8330e9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.subtitle { text-align: center; color: #ff006e; margin-bottom: 20px; }
 .info { text-align: center; margin: 20px 0; }
-button {
-    padding: 12px 30px; background: #00ff88; color: black; border: none;
-    border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1rem;
-}
-button:hover { background: #00cc66; }
-#loading { text-align: center; font-size: 1.4rem; margin: 50px 0; color: #00ffff; }
-table {
-    width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.05);
-    border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-}
-th { background: #00ffff; color: black; padding: 18px; font-size: 1.2rem; }
+button { padding: 12px 30px; background: #ff006e; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+button:hover { background: #cc0058; }
+#loading { text-align: center; font-size: 1.4rem; margin: 50px; color: #ff006e; }
+table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+th { background: #8330e9; color: white; padding: 18px; }
 td { padding: 16px; text-align: center; }
 tr:hover { background: rgba(255,255,255,0.1); }
 .positive { color: #00ff88; font-weight: bold; font-size: 1.4rem; }
 .negative { color: #ff4444; font-weight: bold; font-size: 1.4rem; }
-.no-data {
-    text-align: center; padding: 60px; background: rgba(255,255,255,0.1);
-    border-radius: 12px; margin-top: 30px; font-size: 1.6rem;
-}
+.no-data { text-align: center; padding: 60px; background: rgba(255,255,255,0.1); border-radius: 12px; margin-top: 30px; font-size: 1.6PHPrem; }
 .hidden { display: none; }
