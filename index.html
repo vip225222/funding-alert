@@ -3,35 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Binance High Funding Rates (±0.50%)</title>
+    <title>Delta High Funding Rates (±0.50%) - No API Key</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>Binance Futures - High Funding Alert</h1>
-        <p class="subtitle">Funding Rate > +0.50% या < -0.50% वाले Only</p>
+        <h1>Delta Exchange High Funding Alert</h1>
+        <p class="subtitle">Funding Rate ±0.50% से ज्यादा वाले Only | Bina API Key ke</p>
         
         <div class="info">
             <p>अंतिम अपडेट: <span id="last-update">Loading...</span></p>
             <button onclick="fetchData()">Manual Refresh 🔄</button>
         </div>
 
-        <div id="loading">Binance से डेटा ला रहा हूँ...</div>
+        <div id="loading">डेटा लोड हो रहा है...</div>
 
         <table id="funding-table">
             <thead>
                 <tr>
                     <th>Symbol</th>
                     <th>Funding Rate</th>
-                    <th>Current Price</th>
-                    <th>Next Funding</th>
+                    <th>Price (Approx)</th>
                 </tr>
             </thead>
             <tbody id="table-body"></tbody>
         </table>
 
         <div id="no-data" class="no-data hidden">
-            <p>अभी कोई भी coin ±0.50% funding cross नहीं कर रहा 😴</p>
+            <p>अभी कोई coin ±0.50% funding cross नहीं कर रहा 😴</p>
         </div>
     </div>
 
