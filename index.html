@@ -3,33 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Delta Funding Rate Monitor (0.50% Alert)</title>
+    <title>Delta Funding Rate Monitor - REST API</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header>
-        <h1>🚨 डेल्टा एक्सचेंज फंडिंग रेट मॉनिटर 🚨</h1>
-        <p>केवल वही Crypto दिखाए जाएंगे जिनका Funding Rate **0.50%** के ऊपर या नीचे (जैसे, > +0.50% या < -0.50%) है।</p>
-        <p class="status">WebSocket स्थिति: <span id="ws-status">कनेक्टिंग...</span></p>
-        <p>स्क्रीनिंग अंतराल: <span id="refresh-interval">5 मिनट</span></p>
+        <h1>🚨 डेल्टा एक्सचेंज फंडिंग अलर्ट 🚨</h1>
+        <p>REST API से डेटा फ़ेच किया जा रहा है। केवल वही Crypto दिखाए जाएंगे जिनका Funding Rate **0.50%** के ऊपर या नीचे है।</p>
     </header>
-<div id="debug-area" style="text-align: left; background-color: #333; padding: 10px; margin: 10px auto; width: 90%; max-height: 200px; overflow-y: scroll; border: 1px solid #ffcc00;">
-    <h3>Live Data Stream (Debugging)</h3>
-    <p>WebSocket messages will appear here...</p>
-</div>
 
-<main>
-    </main>
+    <div class="status-bar">
+        <p class="status">स्थिति: <span id="ws-status" data-status="connecting">कनेक्ट हो रहा...</span></p>
+        <p class="interval">अपडेट अंतराल: 5 मिनट</p>
+    </div>
+
+    <div id="debug-area" class="debug-panel">
+        <h3>Live Log (Debugging)</h3>
+        <p>डेटा फ़ेचिंग लॉग यहाँ दिखेंगे...</p>
+    </div>
 
     <main>
-        <h2>📈 अलर्ट पर मौजूद Crypto (5 मिनट में अपडेट)</h2>
+        <h2>📈 अलर्ट पर मौजूद Crypto (0.50% Threshold)</h2>
         <div id="crypto-list">
-            <p>WebSocket से डेटा आने का इंतज़ार है...</p>
+            <p class="loading-message">डेटा फ़ेच हो रहा है, कृपया इंतज़ार करें...</p>
         </div>
     </main>
 
     <footer>
-        <p>&copy; 2025 Funding Monitor</p>
+        <p>&copy; 2025 Delta Monitor</p>
     </footer>
 
     <script src="script.js"></script>
