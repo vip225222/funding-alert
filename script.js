@@ -1,42 +1,43 @@
-// ⚠️ YAHAN APNA DELTA EXCHANGE API KEY & SECRET DAAL DO ⚠️
-const API_KEY    = "yL8vA2msxSEBtlLwqHvTKE4iDfqNWb";          // ← Yahan daalo
-const API_SECRET = "qIVYL0KnJV7CU5xw7i5nErVKCtajVU2IkyubMF4gRcfpUDQEHLCllFtMals4";       // ← Yahan daalo
-// =====================================================
+// ⚠️ APNA API KEY & SECRET YAHAN DAAL DO ⚠️
+const API_KEY    = "yL8vA2msxSEBtlLwqHvTKE4iDfqNWb";
+const API_SECRET = "qIVYL0KnJV7CU5xw7i5nErVKCtajVU2IkyubMF4gRcfpUDQEHLCllFtMals4";
 
 const API_URL = "https://api.delta.exchange/v2/tickers?contract_types=perpetual";
-const THRESHOLD = 0.0001; // 0.50% = 0.0050
-
-function generateSignature(timestamp) {
-    const string = timestamp + "GET" + "/v2/tickers";
-    return CryptoJS.HmacSHA256(string, API_SECRET).toString(CryptoJS.enc.Hex);
-}
+const THRESHOLD = 0.0050; // 0.50%
 
 async function fetchData() {
-    const tableBody   = document.getElementById("table-body");
-    const loading     = document.getElementById("loading");
-    const noData      = document.getElementById("no-data");
-    const lastUpdate  = document.getElementById("last-update");
+    const tableBody  = document.getElementById("table-body");
+    const loading    = document.getElementById("loading");
+    const noData     = document.getElementById("no-data");
+    const lastUpdate = document.getElementById("last-update");
 
     tableBody.innerHTML = "";
     loading.classList.remove("hidden");
     noData.classList.add("hidden");
 
     try {
-        const timestamp = Date.now();
-        const signature = generateSignature(timestamp);
+        const timestamp = Date.now().toString();
+        const method = "GET";
+        const path = "/v2/tickers";
+        const queryString = "?contract_types=perpetual";
+        
+        // Exact signature string Delta expect karta hai
+        const signatureString = timestamp + method + path + queryString;
+        const signature = CryptoJS.HmacSHA256(signatureString, API_SECRET).toString(CryptoJS.enc.Hex);
 
         const response = await fetch(API_URL, {
             method: "GET",
             headers: {
                 "api-key": API_KEY,
-                "timestamp": timestamp.toString(),
+                "timestamp": timestamp,
                 "signature": signature,
                 "Content-Type": "application/json"
             }
         });
 
         if (!response.ok) {
-            throw new Error(`API Error: ${response.status}`);
+            const err = await response.text();
+            throw new Error(`API Error ${response.status}: ${err}`);
         }
 
         const data = await response.json();
@@ -70,21 +71,14 @@ async function fetchData() {
 
     } catch (error) {
         tableBody.innerHTML = `<tr><td colspan="4">Error 😓<br>${error.message}</td></tr>`;
-        console.error(error);
+        console.error("Delta API Error:", error);
     } finally {
         loading.classList.add("hidden");
     }
 }
 
-// Auto start after CryptoJS loads
-if (typeof CryptoJS !== "undefined") {
+// Start after CryptoJS loads
+setTimeout(() => {
     fetchData();
-    setInterval(fetchData, 60000); // Har 1 minute update
-} else {
-    document.addEventListener("DOMContentLoaded", () => {
-        setTimeout(() => {
-            fetchData();
-            setInterval(fetchData, 60000);
-        }, 1000);
-    });
-}
+    setInterval(fetchData, 60000);
+}, 1000);
