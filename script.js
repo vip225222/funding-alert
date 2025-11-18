@@ -1,6 +1,6 @@
 /**
- * Delta Exchange Funding Rate Monitor - Public REST API Polling Version
- * API Key या WebSocket की आवश्यकता नहीं है। Public Data Polling का उपयोग करता है।
+ * Delta Exchange Monitor - Public REST API Polling Version
+ * यह कोड सुरक्षित रूप से Public REST API का उपयोग करता है।
  */
 
 // 1. कॉन्फ़िगरेशन
@@ -9,20 +9,18 @@ const FUNDING_THRESHOLD = 0.0050; // 0.50%
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 मिनट
 
 // 2. DOM एलिमेंट्स
-const statusDisplay = document.getElementById('ws-status'); // नाम ws-status ही रहने दें
+const statusDisplay = document.getElementById('ws-status');
 const listContainer = document.getElementById('crypto-list');
 const debugArea = document.getElementById('debug-area');
 
-// 3. डेटा स्टोर
-let marketRates = {}; 
-
+// Helper function for mobile debugging logs
 function logToDebugArea(message) {
-    // मोबाइल डीबगिंग के लिए
     const p = document.createElement('p');
     p.style.margin = '2px 0';
     p.style.fontSize = '0.7em';
     p.textContent = message;
     
+    // केवल 20 लॉग्स रखें
     if (debugArea.children.length > 20) {
         debugArea.removeChild(debugArea.children[1]); 
     }
@@ -30,7 +28,9 @@ function logToDebugArea(message) {
     debugArea.scrollTop = debugArea.scrollHeight; 
 }
 
-// 4. REST API से डेटा Fetch करने का मुख्य फंक्शन
+let marketRates = {}; 
+
+// 3. REST API से डेटा Fetch करने का मुख्य फंक्शन
 async function fetchFundingRates() {
     logToDebugArea(`🔄 Fetching data from REST API at ${new Date().toLocaleTimeString()}...`);
     statusDisplay.textContent = "डेटा फ़ेच हो रहा...";
@@ -38,19 +38,19 @@ async function fetchFundingRates() {
 
     try {
         const response = await fetch(REST_API_URL);
+        
         if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
         }
         
         const data = await response.json();
         
-        // **डेटा प्रोसेसिंग:** हम मान रहे हैं कि डेटा एक एरे में है
         if (data && Array.isArray(data)) {
             marketRates = {}; // डेटा स्टोर को रीसेट करें
             let processedCount = 0;
             
             data.forEach(product => {
-                // केवल Perpetual Futures (PERP) को देखें
+                // केवल Perpetual Futures को प्रोसेस करें और सुनिश्चित करें कि फंडिंग रेट मौजूद है
                 if (product.perpetual === true && product.symbol && product.funding_rate !== undefined) {
                     const symbol = product.symbol;
                     const fundingRate = parseFloat(product.funding_rate);
@@ -74,24 +74,27 @@ async function fetchFundingRates() {
         }
 
     } catch (error) {
-        logToDebugArea(`❌ Fetch Error: ${error.message}`);
+        logToDebugArea(`❌ Fetch Error: ${error.message}.`);
         statusDisplay.textContent = "कनेक्शन एरर";
         statusDisplay.setAttribute('data-status', 'error');
     }
 }
 
 
-// 5. डिस्प्ले को अपडेट करने का फंक्शन
+// 4. डिस्प्ले को अपडेट करने का फंक्शन
 function refreshDisplay() {
     listContainer.innerHTML = ''; 
     let alertFound = false;
+
+    // 0.50% की वास्तविक थ्रेशोल्ड
+    const currentThreshold = FUNDING_THRESHOLD;
 
     for (const symbol in marketRates) {
         const rate = marketRates[symbol];
         const absRate = Math.abs(rate);
         
-        // शर्त चेक करें: 0.50% की वास्तविक थ्रेशोल्ड
-        if (absRate >= FUNDING_THRESHOLD) {
+        // शर्त चेक करें
+        if (absRate >= currentThreshold) {
             alertFound = true;
             
             const card = document.createElement('div');
@@ -103,6 +106,26 @@ function refreshDisplay() {
             card.className = `crypto-card ${cardClass}`;
             card.innerHTML = `
                 <div class="symbol">${symbol}</div>
+                <div class="rate">Funding Rate: <span class="${rateClass}">${ratePercent}</span></div>
+                <p>साइड: ${rate > 0 ? 'LONG (Pay Short)' : 'SHORT (Pay Long)'}</p>
+            `;
+            listContainer.appendChild(card);
+        }
+    }
+
+    if (!alertFound) {
+        listContainer.innerHTML = `<p class="loading-message">वर्तमान में कोई Crypto **${(currentThreshold * 100).toFixed(2)}%** की अलर्ट सीमा को पार नहीं कर रहा है।</p>`;
+    }
+}
+
+// 5. मुख्य प्रक्रिया शुरू करना
+document.addEventListener('DOMContentLoaded', () => {
+    // तुरंत पहली बार डेटा फ़ेच करें
+    fetchFundingRates();
+    
+    // हर 5 मिनट में डेटा फ़ेच करें (Polling)
+    setInterval(fetchFundingRates, REFRESH_INTERVAL_MS);
+});
                 <div class="rate">Funding Rate: <span class="${rateClass}">${ratePercent}</span></div>
                 <p>साइड: ${rate > 0 ? 'LONG (Pay Short)' : 'SHORT (Pay Long)'}</p>
             `;
