@@ -1,22 +1,20 @@
 /**
- * Delta Exchange Funding Monitor - API Key Version
- * Designed for Mobile App Experience
+ * Delta Exchange Funding Monitor - With Loading Animation
  */
 
 // ==========================================
-// 🔑 CONFIGURATION (अपनी KEY यहाँ डालें)
+// 🔑 CONFIGURATION
 // ==========================================
-const API_KEY = "yL8vA2msxSEBtlLwqHvTKE4iDfqNWb"; 
+const API_KEY = "yL8vA2msxSEBtlLwqHvTKE4iDfqNWb"; // <--- अपनी Key यहाँ डालें
 // ==========================================
 
 const API_URL = "https://api.delta.exchange/v2/products";
 const THRESHOLD = 0.0050; // 0.50%
-const REFRESH_TIME = 5 * 60; // 5 minutes in seconds
+const REFRESH_TIME = 5 * 60; // 5 minutes
 
 // Elements
 const grid = document.getElementById('crypto-grid');
 const statusBadge = document.getElementById('connection-status');
-const statusDot = document.querySelector('.dot');
 const countdownEl = document.getElementById('countdown');
 
 let countdownTimer = REFRESH_TIME;
@@ -24,17 +22,22 @@ let countdownTimer = REFRESH_TIME;
 // --- 1. Fetch Data Function ---
 async function fetchMarketData() {
     updateStatus('updating');
+
+    // 🔥 SHOW LOADING SPINNER 🔥
+    // जब तक डेटा नहीं आता, यह एनिमेशन दिखाओ
+    grid.innerHTML = `
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <p>Scanning Market Data...</p>
+        </div>
+    `;
     
     try {
-        // API Call with Headers
         const response = await fetch(API_URL, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
-                // अगर Delta सिर्फ api-key header मांगता है तो इसे use करे,
-                // अगर Bearer token मांगता है तो 'Authorization': `Bearer ${API_KEY}` use करें.
-                // यहाँ हम एक सामान्य तरीका अपना रहे हैं:
-                'api-key': API_KEY 
+                'api-key': API_KEY
             }
         });
 
@@ -42,9 +45,13 @@ async function fetchMarketData() {
 
         const data = await response.json();
         
-        // Process Data
         if(Array.isArray(data)) {
             renderCards(data);
+            updateStatus('connected');
+            resetTimer();
+        } else if (data.result && Array.isArray(data.result)) {
+             // कभी कभी डेटा data.result के अंदर होता है
+            renderCards(data.result);
             updateStatus('connected');
             resetTimer();
         }
@@ -52,23 +59,28 @@ async function fetchMarketData() {
     } catch (error) {
         console.error(error);
         updateStatus('error');
-        grid.innerHTML = `<div class="loading-spinner" style="color:#ef4444">Error loading data. <br> Check API Key.</div>`;
+        // Error आने पर भी दिखेगा कि क्या हुआ
+        grid.innerHTML = `
+            <div class="loading-container">
+                <p style="color: #ef4444; font-size: 1.5rem;">⚠️</p>
+                <p style="color: #ef4444;">Connection Failed</p>
+                <p style="font-size: 0.8rem;">Retrying in 5 min...</p>
+            </div>`;
     }
 }
 
 // --- 2. Render Cards Function ---
 function renderCards(products) {
-    grid.innerHTML = ''; // Clear existing
+    // पहले ग्रिड खाली करें
+    grid.innerHTML = ''; 
     let hasOpportunities = false;
 
     products.forEach(product => {
-        // Filter: Only Perpetuals & Check Funding Rate
         if (product.perpetual && product.funding_rate) {
             
             const rate = parseFloat(product.funding_rate);
             const absRate = Math.abs(rate);
 
-            // CHECK THRESHOLD (0.50%)
             if (absRate >= THRESHOLD) {
                 hasOpportunities = true;
                 createCard(product.symbol, rate);
@@ -77,10 +89,12 @@ function renderCards(products) {
     });
 
     if (!hasOpportunities) {
+        // अगर कोई डेटा 0.50% के ऊपर नहीं है
         grid.innerHTML = `
-            <div class="loading-spinner">
-                No crypto above 0.50% right now.<br>
-                Scanning market...
+            <div class="loading-container">
+                <p style="font-size: 2rem;">😴</p>
+                <p>Market is calm.</p>
+                <p style="font-size: 0.8rem;">No crypto above 0.50% funding.</p>
             </div>`;
     }
 }
@@ -121,6 +135,8 @@ function updateStatus(state) {
         statusBadge.classList.add('status-error');
     } else {
         statusBadge.innerHTML = '<span class="dot"></span> Updating...';
+        statusBadge.classList.remove('status-connected');
+        statusBadge.classList.remove('status-error');
     }
 }
 
@@ -132,12 +148,11 @@ function resetTimer() {
 setInterval(() => {
     if(countdownTimer > 0) {
         countdownTimer--;
-        // Format MM:SS
         const m = Math.floor(countdownTimer / 60);
         const s = countdownTimer % 60;
         countdownEl.textContent = `${m}:${s < 10 ? '0'+s : s}`;
     } else {
-        fetchMarketData(); // Timer ends, fetch new data
+        fetchMarketData();
     }
 }, 1000);
 
