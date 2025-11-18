@@ -1,139 +1,90 @@
-/**
- * Delta Exchange Funding Monitor - FINAL PRODUCTION READY VERSION
- * Designed to work with a Serverless Proxy (e.g., Netlify/Vercel) to bypass CORS.
- */
+// ⚠️ YAHAN APNA DELTA EXCHANGE API KEY & SECRET DAAL DO ⚠️
+const API_KEY    = "yL8vA2msxSEBtlLwqHvTKE4iDfqNWb";          // ← Yahan daalo
+const API_SECRET = "qIVYL0KnJV7CU5xw7i5nErVKCtajVU2IkyubMF4gRcfpUDQEHLCllFtMals4";       // ← Yahan daalo
+// =====================================================
 
-// =======================================================
-// ⚠️ IMPORTANT: इस URL को अपने Serverless Function URL से बदलें
-// For testing on GitHub Pages, use: 
-// const API_URL = "https://api.delta.exchange/v2/products"; 
-// =======================================================
-const API_URL = "https://api.delta.exchange/v2/products"; 
-// =======================================================
+const API_URL = "https://api.delta.exchange/v2/tickers?contract_types=perpetual";
+const THRESHOLD = 0.0050; // 0.50% = 0.0050
 
-const FUNDING_THRESHOLD = 0.0050; // 0.50% (Testing ke baad ise 0.0050 rakhein)
-const REFRESH_TIME = 5 * 60; // 5 minutes (in seconds)
-
-// DOM Elements
-const fundingGrid = document.getElementById('crypto-list') || document.getElementById('funding-grid'); 
-const statusBadge = document.getElementById('connection-status');
-const countdownEl = document.getElementById('countdown');
-
-let countdownTimer = REFRESH_TIME;
-
-// --- 1. Status Update Utility ---
-function updateStatus(state) {
-    const badge = statusBadge || document.createElement('div');
-    if (state === 'connected') {
-        badge.innerHTML = `<span class="dot"></span> Live`;
-        badge.classList.add('status-connected');
-        badge.classList.remove('status-error');
-    } else if (state === 'error') {
-        badge.innerHTML = `<span class="dot"></span> Error`;
-        badge.classList.add('status-error');
-        badge.classList.remove('status-connected');
-    } else {
-        badge.innerHTML = `<span class="dot"></span> Updating...`;
-        badge.classList.remove('status-connected', 'status-error');
-    }
+function generateSignature(timestamp) {
+    const string = timestamp + "GET" + "/v2/tickers";
+    return CryptoJS.HmacSHA256(string, API_SECRET).toString(CryptoJS.enc.Hex);
 }
 
-// --- 2. Main Fetch Function ---
-async function fetchMarketData() {
-    updateStatus('updating');
+async function fetchData() {
+    const tableBody   = document.getElementById("table-body");
+    const loading     = document.getElementById("loading");
+    const noData      = document.getElementById("no-data");
+    const lastUpdate  = document.getElementById("last-update");
 
-    // Show loading spinner while fetching
-    fundingGrid.innerHTML = `
-        <div class="loading-container">
-            <div class="spinner"></div>
-            <p>Scanning Delta Market...</p>
-        </div>
-    `;
-    
+    tableBody.innerHTML = "";
+    loading.classList.remove("hidden");
+    noData.classList.add("hidden");
+
     try {
-        const response = await fetch(API_URL);
+        const timestamp = Date.now();
+        const signature = generateSignature(timestamp);
 
-        if (!response.ok) throw new Error(`HTTP Status: ${response.status}`);
+        const response = await fetch(API_URL, {
+            method: "GET",
+            headers: {
+                "api-key": API_KEY,
+                "timestamp": timestamp.toString(),
+                "signature": signature,
+                "Content-Type": "application/json"
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
 
         const data = await response.json();
-        
-        if (data && Array.isArray(data)) {
-            renderCards(data);
-            updateStatus('connected');
-            resetTimer();
+
+        const highFunding = data.result
+            .filter(item => Math.abs(parseFloat(item.funding_rate || 0)) >= THRESHOLD)
+            .sort((a, b) => Math.abs(parseFloat(b.funding_rate)) - Math.abs(parseFloat(a.funding_rate)));
+
+        if (highFunding.length === 0) {
+            noData.classList.remove("hidden");
         } else {
-            throw new Error("Invalid or empty data format received.");
+            highFunding.forEach(item => {
+                const rate = parseFloat(item.funding_rate);
+                const ratePercent = (rate * 100).toFixed(4);
+                const symbol = item.symbol.replace("_PERP", "");
+
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td data-label="Symbol">${symbol}</td>
+                    <td data-label="Funding" class="${rate > 0 ? 'positive' : 'negative'}">
+                        ${rate > 0 ? "🟢 +" : "🔴"} ${ratePercent}%
+                    </td>
+                    <td data-label="Price">$${parseFloat(item.mark_price).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td data-label="Next Funding">${item.time_to_funding || "Soon"}</td>
+                `;
+                tableBody.appendChild(row);
+            });
         }
+
+        lastUpdate.textContent = new Date().toLocaleString('en-IN');
 
     } catch (error) {
-        updateStatus('error');
-        fundingGrid.innerHTML = `
-            <div class="loading-container">
-                <p style="color: #ef4444; font-size: 1.5rem;">❌</p>
-                <p style="color: #ef4444;">API Connection Failed.</p>
-                <p style="font-size: 0.8rem;">(Need a Serverless Proxy)</p>
-            </div>`;
+        tableBody.innerHTML = `<tr><td colspan="4">Error 😓<br>${error.message}</td></tr>`;
+        console.error(error);
+    } finally {
+        loading.classList.add("hidden");
     }
 }
 
-// --- 3. Render Cards Function ---
-function renderCards(products) {
-    fundingGrid.innerHTML = ''; 
-    let hasOpportunities = false;
-    
-    products.forEach(p => {
-        // Check for Perpetual Futures and Funding Rate field
-        if (p.perpetual === true && p.symbol && p.funding_rate !== undefined) {
-            
-            const rate = parseFloat(p.funding_rate);
-            const absRate = Math.abs(rate);
-
-            if (absRate >= FUNDING_THRESHOLD) {
-                hasOpportunities = true;
-                const isPositive = rate > 0;
-                const ratePercent = (rate * 100).toFixed(4) + '%';
-                
-                const div = document.createElement('div');
-                div.className = `crypto-card ${isPositive ? 'long' : 'short'}`;
-                
-                div.innerHTML = `
-                    <div class="symbol-info">
-                        <h2>${p.symbol}</h2>
-                        <p>${isPositive ? 'LONG (Pay Short)' : 'SHORT (Pay Long)'}</p>
-                    </div>
-                    <div class="rate-info">
-                        <span class="rate-val" style="color: ${isPositive ? '#10b981' : '#ef4444'}">${ratePercent}</span>
-                        <span class="sub-val">Funding Rate</span>
-                    </div>
-                `;
-                fundingGrid.appendChild(div);
-            }
-        }
+// Auto start after CryptoJS loads
+if (typeof CryptoJS !== "undefined") {
+    fetchData();
+    setInterval(fetchData, 60000); // Har 1 minute update
+} else {
+    document.addEventListener("DOMContentLoaded", () => {
+        setTimeout(() => {
+            fetchData();
+            setInterval(fetchData, 60000);
+        }, 1000);
     });
-
-    if (!hasOpportunities) {
-        fundingGrid.innerHTML = `
-            <div class="loading-container">
-                <p style="font-size: 2rem;">😴</p>
-                <p>Threshold: ${(FUNDING_THRESHOLD * 100).toFixed(2)}%</p>
-                <p style="font-size: 0.8rem;">No crypto found.</p>
-            </div>`;
-    }
 }
-
-// --- 4. Timer & Init ---
-function resetTimer() { countdownTimer = REFRESH_TIME; }
-
-setInterval(() => {
-    if(countdownTimer > 0) {
-        countdownTimer--;
-        const m = Math.floor(countdownTimer / 60);
-        const s = countdownTimer % 60;
-        if(countdownEl) countdownEl.textContent = `${m}:${s < 10 ? '0'+s : s}`;
-    } else {
-        fetchMarketData();
-    }
-}, 1000);
-
-// Start on load
-document.addEventListener('DOMContentLoaded', fetchMarketData);
